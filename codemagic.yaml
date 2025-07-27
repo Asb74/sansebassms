@@ -1,26 +1,27 @@
 workflows:
-  ios-build:
-    name: iOS Build
-    instance_type: mac_mini_m1
-    max_build_duration: 60
+  ios-release:
+    name: iOS Release Build
     environment:
       flutter: stable
-      xcode: latest
+      xcode: 15.2
       cocoapods: default
-    triggering:
-      events:
-        - push
-      branch_patterns:
-        - pattern: main
-          include: true
-          source: true
     scripts:
-      - name: 📦 Instalando dependencias
+      - name: 🔄 Limpiar y reinstalar pods
+        script: |
+          cd ios
+          rm -rf Pods Podfile.lock
+          pod cache clean --all
+          pod install
+          cd ..
+      - name: 📦 Obtener dependencias Flutter
         script: flutter pub get
-      - name: 🧪 Analizando código
-        script: flutter analyze
-      - name: 🚀 Compilando IPA
-        script: flutter build ios --release --no-codesign
+      - name: 🚀 Compilar aplicación iOS (sin firma)
+        script: flutter build ios --release
     artifacts:
       - build/ios/iphoneos/*.ipa
-      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/Runner.app
+      - build/ios/archive/*.xcarchive
+    publishing:
+      email:
+        recipients:
+          - tu_correo@ejemplo.com
