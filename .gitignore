@@ -1,4 +1,4 @@
-# Flutter/Dart/Pub related
+Android# Flutter/Dart/Pub related
 .dart_tool/
 .packages
 .pub-cache/
@@ -16,7 +16,7 @@ android/local.properties
 ios/Pods/
 ios/.symlinks/
 ios/Flutter/Flutter.framework
-ios/Flutter/Flutter.podspec
+#ios/Flutter/Flutter.podspec
 ios/Flutter/Generated.xcconfig
 ios/.generated/
 
