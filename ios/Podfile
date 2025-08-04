@@ -4,17 +4,7 @@ use_frameworks! :linkage => :static
 use_modular_headers!
 
 target 'Runner' do
-  flutter_install_plugins
-end
-
-def flutter_install_plugins
-  generated_plugin_registrant = File.expand_path(File.join('..', '.flutter-plugins-dependencies'))
-  if File.exist?(generated_plugin_registrant)
-    plugin_specs = JSON.parse(File.read(generated_plugin_registrant))
-    plugin_specs['plugins']['ios'].each do |plugin|
-      pod plugin['name'], :path => plugin['path']
-    end
-  end
+  flutter_install_all_plugin_pods(File.dirname(File.realpath(__FILE__)))
 end
 
 post_install do |installer|
