@@ -1,15 +1,12 @@
+require 'json'
+
 def install_all_flutter_pods(flutter_application_path)
   install_flutter_engine_pod
   install_flutter_plugin_pods(flutter_application_path)
 end
 
 def install_flutter_engine_pod
-  engine_dir = File.join(__dir__, 'engine')
-  if !File.exist?(engine_dir)
-    engine_dir = File.join(File.dirname(`flutter --version`), 'bin', 'cache', 'artifacts', 'engine', 'ios')
-  end
-
-  pod 'Flutter', :path => engine_dir
+  pod 'Flutter', :path => File.expand_path(File.join('..', '..', '.symlinks', 'flutter'))
 end
 
 def install_flutter_plugin_pods(flutter_application_path)
