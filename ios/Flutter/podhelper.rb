@@ -6,7 +6,8 @@ def install_all_flutter_pods(flutter_application_path)
 end
 
 def install_flutter_engine_pod
-  pod 'Flutter', :path => File.expand_path(File.join('..', '..', '.symlinks', 'flutter'))
+  pod 'Flutter', :path => File.join(ENV['FLUTTER_ROOT'], 'bin', 'cache', 'artifacts', 'engine', 'ios')
+
 end
 
 def install_flutter_plugin_pods(flutter_application_path)
