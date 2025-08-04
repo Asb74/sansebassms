@@ -1,7 +1,6 @@
 platform :ios, '15.0'
 
 # Import Flutter functions
-require File.expand_path('../flutter_export_environment', __FILE__)
 require File.expand_path('packages/flutter_tools/bin/podhelper', __dir__)
 
 target 'Runner' do
