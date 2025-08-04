@@ -4,7 +4,7 @@ use_frameworks!
 use_modular_headers!
 
 target 'Runner' do
-  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
+  flutter_install_all_plugin_pods(File.dirname(File.realpath(__FILE__)))
 end
 
 post_install do |installer|
