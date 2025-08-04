@@ -1,11 +1,14 @@
 platform :ios, '15.0'
 
-# Import Flutter functions
-require File.expand_path('packages/flutter_tools/bin/podhelper', __dir__)
+use_frameworks!
+use_modular_headers!
 
 target 'Runner' do
-  use_frameworks!
-  use_modular_headers!
+  flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+end
 
-  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
+post_install do |installer|
+  installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
+  end
 end
