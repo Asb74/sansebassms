@@ -25,28 +25,23 @@ workflows:
 
       - name: Create Flutter.podspec manually if missing
         script: |
-          PODSPEC_PATH="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
-          if [ ! -f "$PODSPEC_PATH" ]; then
-            echo "⚠️ Flutter.podspec no encontrado, creando..."
-            mkdir -p "$(dirname "$PODSPEC_PATH")"
-            cat <<'EOF' > "$PODSPEC_PATH"
-              Pod::Spec.new do |s|
-                s.name             = 'Flutter'
-                s.version          = '1.0.0'
-                s.summary          = 'Flutter Engine'
-                s.description      = <<-DESC
-                  flutter engine framework
-                DESC
-                s.homepage         = 'https://flutter.dev'
-                s.license          = { :type => 'BSD' }
-                s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
-                s.source           = { :http => 'https://github.com/flutter/flutter' }
-                s.documentation_url = 'https://flutter.dev/docs'
-                s.platform         = :ios, '8.0'
-                s.vendored_frameworks = 'Flutter.framework'
-              end
-            EOF
-          fi
+          Pod::Spec.new do |s|
+            s.name             = 'Flutter'
+            s.version          = '1.0.0'
+            s.summary          = 'Flutter Engine'
+            s.description      = <<-DESC
+              flutter engine framework
+            DESC
+            s.homepage         = 'https://flutter.dev'
+            s.license          = { :type => 'BSD' }
+            s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
+            s.source           = { :http => 'https://github.com/flutter/flutter' }
+            s.documentation_url = 'https://flutter.dev/docs'
+            s.platform         = :ios, '8.0'
+            s.vendored_frameworks = 'Flutter.framework'
+          end
+          EOF
+                    fi
 
       - name: Install CocoaPods dependencies
         script: |
