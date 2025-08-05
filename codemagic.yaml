@@ -11,7 +11,7 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
         APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
       groups:
-        - app_store_credentials # contiene APP_STORE_CONNECT_PRIVATE_KEY en base64
+        - app_store_credentials
     triggering:
       events:
         - push
@@ -20,11 +20,10 @@ workflows:
           include: true
 
     scripts:
-      - name: Precache and build Flutter iOS
+      - name: Get dependencies
         script: |
           flutter pub get
           flutter precache --ios
-          flutter build ios --release --no-codesign
 
       - name: Copy Flutter.podspec if missing
         script: |
@@ -38,6 +37,10 @@ workflows:
         script: |
           cd ios
           pod install
+
+      - name: Build iOS app
+        script: |
+          flutter build ios --release --no-codesign
 
       - name: Decode private key from base64
         script: |
