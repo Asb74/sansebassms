@@ -22,6 +22,9 @@ workflows:
       - name: Install dependencies
         script: |
           flutter pub get
+          flutter precache --ios
+          flutter build ios --release --no-codesign
+
           cd ios
           ruby Flutter/podhelper.rb
           pod install
