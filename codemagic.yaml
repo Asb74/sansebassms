@@ -30,7 +30,7 @@ workflows:
           PODSPEC_PATH="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
           if [ ! -f "$PODSPEC_PATH" ]; then
             echo "⚠️ Flutter.podspec no encontrado, creando manualmente..."
-            cat <<EOF > "$PODSPEC_PATH"
+            cat <<'EOF' > "$PODSPEC_PATH"
 Pod::Spec.new do |s|
   s.name             = 'Flutter'
   s.version          = '1.0.0'
