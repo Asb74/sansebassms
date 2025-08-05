@@ -7,8 +7,8 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        - app_store_credentials   # Incluye: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
-        - certificate_credentials # Incluye: CERTIFICATE_PRIVATE_KEY (contenido del .key), CERTIFICATE_PEM (contenido del .pem)
+        - app_store_credentials
+
       vars:
         XCODE_WORKSPACE: "ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
@@ -38,31 +38,31 @@ workflows:
           pod install
           cd ..
 
+      - name: Check ios/ contents
+        script: |
+          echo "Contenido de ios/"
+          ls -la ios
+
       - name: Set up keychain
         script: |
           keychain initialize
 
       - name: Fetch signing files
         script: |
-          app-store-connect fetch-signing-files $BUNDLE_ID \
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --certificate-key "$CERTIFICATE_PRIVATE_KEY" \
-            --certificates-dir ./certs \
-            --profiles-dir ./profiles
+            --certificate-key "$CERTIFICATE_PRIVATE_KEY"
 
-      - name: Add signing certificates
+      - name: Use system default keychain
         script: |
           keychain add-certificates
 
-      - name: Set up code signing settings
+      - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
 
-      # Paso opcional - eliminar si no usas agvtool
+      # Este paso requiere configuración adicional del proyecto para usar agvtool
       # - name: Increment build number
       #   script: |
       #     agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
