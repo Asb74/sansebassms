@@ -1,0 +1,31 @@
+workflows:
+  ios-release:
+    name: Sansebassms iOS Release
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "com.example.sansebassms"
+        APPLE_TEAM_ID: "7QWJ8R3ZB5"
+    scripts:
+      - name: Obtener dependencias
+        script: |
+          flutter pub get
+      - name: Precargar recursos Flutter
+        script: |
+          flutter precache --ios
+      - name: Instalar Pods
+        script: |
+          cd ios
+          pod install
+      - name: Compilar .ipa
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      email:
+        recipients:
+          - amtoniosazon@gmail.com
