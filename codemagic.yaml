@@ -1,31 +1,41 @@
 workflows:
   ios-release:
-    name: Sansebassms iOS Release
+    name: Build iOS Release without Mac
     environment:
       flutter: stable
       xcode: latest
-      cocoapods: default
       vars:
-        BUNDLE_ID: "com.example.sansebassms"
-        APPLE_TEAM_ID: "7QWJ8R3ZB5"
+        BUNDLE_ID: "com.example.sansebassms"  # reemplaza con tu bundle ID
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
     scripts:
-      - name: Obtener dependencias
+      - name: Install dependencies
         script: |
           flutter pub get
-      - name: Precargar recursos Flutter
+
+      - name: Flutter clean
         script: |
-          flutter precache --ios
-      - name: Instalar Pods
-        script: |
-          cd ios
-          pod install
-      - name: Compilar .ipa
+          flutter clean
+
+      - name: Build IPA
         script: |
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
+
     artifacts:
       - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.dSYM.zip
+
+    code_signing:
+      use_automatic_signing: true
+
     publishing:
-      email:
-        recipients:
-          - amtoniosazon@gmail.com
+      app_store_connect:
+        auth: integration  # usa las credenciales .p8 cargadas en Codemagic
+        submit_to_testflight: true
+        beta_groups:
+          - SansebassmsTesters  # opcional, nombre del grupo de testers si tienes uno
