@@ -7,10 +7,10 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        - app_store_credentials
-
+        - app_store_credentials   # Incluye: APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
+        - certificate_credentials # Incluye: CERTIFICATE_PRIVATE_KEY (contenido del .key), CERTIFICATE_PEM (contenido del .pem)
       vars:
-        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.example.sansebassms"
         APP_STORE_APPLE_ID: 6749592028
@@ -32,28 +32,40 @@ workflows:
         script: |
           flutter pub get
 
+      - name: Install CocoaPods dependencies
+        script: |
+          cd ios
+          pod install
+          cd ..
+
       - name: Set up keychain
         script: |
           keychain initialize
 
       - name: Fetch signing files
         script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+          app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
             --create \
-            --certificate-key "$CERTIFICATE_PRIVATE_KEY"
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --certificate-key "$CERTIFICATE_PRIVATE_KEY" \
+            --certificates-dir ./certs \
+            --profiles-dir ./profiles
 
-      - name: Use system default keychain
+      - name: Add signing certificates
         script: |
           keychain add-certificates
 
-      - name: Set up code signing settings on Xcode project
+      - name: Set up code signing settings
         script: |
           xcode-project use-profiles
 
-      #- name: Increment build number
-      #  script: |
-      #    agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
+      # Paso opcional - eliminar si no usas agvtool
+      # - name: Increment build number
+      #   script: |
+      #     agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
 
       - name: Build ipa for distribution
         script: |
