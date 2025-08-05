@@ -41,4 +41,4 @@ workflows:
 
     publishing:
       app_store_connect:
-        auth: app_store_connect_key
+        auth: CodemagicKey
