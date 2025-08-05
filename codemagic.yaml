@@ -1,41 +1,46 @@
 workflows:
-  ios-release:
-    name: Build iOS Release without Mac
+  build-ios-without-mac:
+    name: Build iOS app without Mac
     environment:
       flutter: stable
       xcode: latest
       vars:
-        BUNDLE_ID: "com.example.sansebassms"  # reemplaza con tu bundle ID
+        BUNDLE_ID: "com.example.sansebassms"
+        APP_STORE_CONNECT_ISSUER_ID: EnTuCuentaDeApple
+        APP_STORE_CONNECT_KEY_IDENTIFIER: ABC1234567
+        APP_STORE_CONNECT_PRIVATE_KEY: EnBase64TuArchivoP8
     triggering:
       events:
         - push
-      branch_patterns:
-        - pattern: main
-          include: true
     scripts:
-      - name: Install dependencies
+      - name: Pre-cache and clean
         script: |
+          flutter precache --ios
           flutter pub get
-
-      - name: Flutter clean
-        script: |
           flutter clean
 
-      - name: Build IPA
+      - name: Patch missing Flutter.podspec
+        script: |
+          PODSPEC_SOURCE="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
+          PODSPEC_TARGET="ios/Flutter/Flutter.podspec"
+          if [ -f "$PODSPEC_SOURCE" ]; then
+            echo "✔ Copiando Flutter.podspec al proyecto..."
+            mkdir -p ios/Flutter
+            cp "$PODSPEC_SOURCE" "$PODSPEC_TARGET"
+          else
+            echo "❌ No se encontró Flutter.podspec en $PODSPEC_SOURCE"
+            exit 1
+          fi
+
+      - name: Build IPA for App Store
         script: |
           flutter build ipa --release \
             --export-options-plist=/Users/builder/export_options.plist
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.dSYM.zip
-
-    code_signing:
-      use_automatic_signing: true
 
     publishing:
       app_store_connect:
-        auth: integration  # usa las credenciales .p8 cargadas en Codemagic
-        submit_to_testflight: true
-        beta_groups:
-          - SansebassmsTesters  # opcional, nombre del grupo de testers si tienes uno
+        auth: app_store_connect_key
+        app_id: 1754300715
