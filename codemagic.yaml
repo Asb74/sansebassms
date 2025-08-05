@@ -62,7 +62,14 @@ workflows:
         script: |
           xcode-project use-profiles
 
-      # Este paso requiere configuración adicional del proyecto para usar agvtool
+      # Nuevo paso: asegura que los archivos nativos estén generados antes de compilar
+      - name: Ensure GeneratedPluginRegistrant is created
+        script: |
+          flutter clean
+          flutter pub get
+          flutter build ios --debug
+
+      # Paso opcional, desactivado por ahora
       # - name: Increment build number
       #   script: |
       #     agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
@@ -84,7 +91,7 @@ workflows:
 
       email:
         recipients:
-          - antoniosazon@gmail.com
+          - amtoniosazon@gmail.com
         notify:
           success: true
           failure: true
