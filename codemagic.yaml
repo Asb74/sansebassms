@@ -25,19 +25,18 @@ workflows:
           flutter pub get
           flutter precache --ios
 
-      - name: Create Flutter.podspec if missing
+      - name: Create Flutter.podspec manually if missing
         script: |
           PODSPEC_PATH="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
           if [ ! -f "$PODSPEC_PATH" ]; then
-            echo "Creating missing Flutter.podspec..."
+            echo "⚠️ Flutter.podspec no encontrado, creando..."
             mkdir -p "$(dirname "$PODSPEC_PATH")"
-            cat <<EOF > "$PODSPEC_PATH"
-Pod::Spec.new do |s|
+            echo "Pod::Spec.new do |s|
   s.name             = 'Flutter'
   s.version          = '1.0.0'
   s.summary          = 'Flutter Engine'
   s.description      = <<-DESC
-Flutter engine framework
+flutter engine framework
 DESC
   s.homepage         = 'https://flutter.dev'
   s.license          = { :type => 'BSD' }
@@ -46,8 +45,7 @@ DESC
   s.documentation_url = 'https://flutter.dev/docs'
   s.platform         = :ios, '8.0'
   s.vendored_frameworks = 'Flutter.framework'
-end
-EOF
+end" > "$PODSPEC_PATH"
           fi
 
       - name: Install CocoaPods
@@ -61,7 +59,7 @@ EOF
 
       - name: Decode private key
         script: |
-          echo $APP_STORE_CONNECT_PRIVATE_KEY | base64 --decode > /tmp/AuthKey.p8
+          echo "$APP_STORE_CONNECT_PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
 
       - name: Set up code signing
         script: |
