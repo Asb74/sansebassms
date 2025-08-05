@@ -30,15 +30,12 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
-
-      - name: Generar Flutter.podspec
+      - name: Prewarm Flutter engine (necesario para Flutter.podspec)
         script: |
-          flutter clean
-          flutter build ios --simulator
+          flutter doctor -v
+          flutter precache --ios
 
-      - name: Copiar Flutter.podspec al lugar esperado por CocoaPods
-        script: |
-          cp Flutter.podspec "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/"
+      
 
       - name: Install CocoaPods dependencies
         script: |
