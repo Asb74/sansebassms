@@ -18,12 +18,10 @@ workflows:
       branch_patterns:
         - pattern: main
           include: true
-
     scripts:
-      - name: Get Flutter dependencies
+      - name: Get Flutter packages
         script: |
           flutter pub get
-          flutter precache --ios
 
       - name: Create Flutter.podspec manually if missing
         script: |
@@ -31,7 +29,8 @@ workflows:
           if [ ! -f "$PODSPEC_PATH" ]; then
             echo "⚠️ Flutter.podspec no encontrado, creando..."
             mkdir -p "$(dirname "$PODSPEC_PATH")"
-            echo "Pod::Spec.new do |s|
+            cat <<EOF > "$PODSPEC_PATH"
+Pod::Spec.new do |s|
   s.name             = 'Flutter'
   s.version          = '1.0.0'
   s.summary          = 'Flutter Engine'
@@ -45,23 +44,17 @@ DESC
   s.documentation_url = 'https://flutter.dev/docs'
   s.platform         = :ios, '8.0'
   s.vendored_frameworks = 'Flutter.framework'
-end" > "$PODSPEC_PATH"
+end
+EOF
           fi
 
-      - name: Install CocoaPods
+      - name: Install CocoaPods dependencies
         script: |
           cd ios
           pod install
+          cd ..
 
-      - name: Build iOS app
-        script: |
-          flutter build ios --release --no-codesign
-
-      - name: Decode private key
-        script: |
-          echo "$APP_STORE_CONNECT_PRIVATE_KEY" | base64 --decode > /tmp/AuthKey.p8
-
-      - name: Set up code signing
+      - name: Set up keychain and code signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files \
@@ -70,21 +63,22 @@ end" > "$PODSPEC_PATH"
             --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key /tmp/AuthKey.p8
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
           keychain add-certificates
 
       - name: Build IPA
         script: |
+          flutter build ios --release --no-codesign
           xcode-project use-profiles
           xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
 
-      - name: Upload to App Store
+      - name: Publish to App Store Connect
         script: |
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key /tmp/AuthKey.p8
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
 
     artifacts:
       - build/ios/ipa/*.ipa
