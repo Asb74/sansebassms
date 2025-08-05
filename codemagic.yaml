@@ -41,6 +41,7 @@ workflows:
           app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
             --create
+            --certificate-key ""
 
 
       - name: Use system default keychain
