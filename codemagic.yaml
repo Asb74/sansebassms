@@ -21,18 +21,27 @@ workflows:
           flutter pub get
           flutter clean
 
-      - name: Patch missing Flutter.podspec
+      - name: Generate Flutter.podspec manually
         script: |
-          PODSPEC_SOURCE="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
-          PODSPEC_TARGET="ios/Flutter/Flutter.podspec"
-          if [ -f "$PODSPEC_SOURCE" ]; then
-            echo "✔ Copiando Flutter.podspec al proyecto..."
-            mkdir -p ios/Flutter
-            cp "$PODSPEC_SOURCE" "$PODSPEC_TARGET"
-          else
-            echo "❌ No se encontró Flutter.podspec en $PODSPEC_SOURCE"
-            exit 1
-          fi
+          mkdir -p ios/Flutter
+          cat > ios/Flutter/Flutter.podspec <<EOF
+          Pod::Spec.new do |s|
+            s.name             = 'Flutter'
+            s.version          = '1.0.0'
+            s.summary          = 'Flutter framework'
+            s.description      = <<-DESC
+                                  Flutter iOS engine
+                                 DESC
+            s.homepage         = 'https://flutter.dev'
+            s.license          = { :type => 'BSD' }
+            s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
+            s.source           = { :http => 'https://flutter.dev' }
+            s.source_files     = '**/*'
+            s.public_header_files = '**/*.h'
+            s.module_map       = 'module.modulemap'
+            s.platform         = :ios, '11.0'
+          end
+          EOF
 
       - name: Build IPA for App Store
         script: |
