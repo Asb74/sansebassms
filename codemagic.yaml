@@ -25,6 +25,7 @@ workflows:
 
       - name: Create Flutter.podspec manually if missing
         script: |
+          cat <<'EOF' > "$PODSPEC_PATH"
           Pod::Spec.new do |s|
             s.name             = 'Flutter'
             s.version          = '1.0.0'
@@ -41,6 +42,7 @@ workflows:
             s.vendored_frameworks = 'Flutter.framework'
           end
           EOF
+
                     fi
 
       - name: Install CocoaPods dependencies
