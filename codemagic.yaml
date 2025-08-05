@@ -20,17 +20,18 @@ workflows:
           include: true
 
     scripts:
-      - name: Get dependencies
+      - name: Get Flutter dependencies
         script: |
           flutter pub get
           flutter precache --ios
 
-      - name: Ensure Flutter.podspec exists
+      - name: Create Flutter.podspec if missing
         script: |
           PODSPEC_PATH="$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/Flutter.podspec"
           if [ ! -f "$PODSPEC_PATH" ]; then
-            echo "⚠️ Flutter.podspec no encontrado, creando manualmente..."
-            cat <<'EOF' > "$PODSPEC_PATH"
+            echo "Creating missing Flutter.podspec..."
+            mkdir -p "$(dirname "$PODSPEC_PATH")"
+            cat <<EOF > "$PODSPEC_PATH"
 Pod::Spec.new do |s|
   s.name             = 'Flutter'
   s.version          = '1.0.0'
@@ -58,11 +59,11 @@ EOF
         script: |
           flutter build ios --release --no-codesign
 
-      - name: Decode private key from base64
+      - name: Decode private key
         script: |
           echo $APP_STORE_CONNECT_PRIVATE_KEY | base64 --decode > /tmp/AuthKey.p8
 
-      - name: Set up keychain and fetch provisioning
+      - name: Set up code signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files \
@@ -79,7 +80,7 @@ EOF
           xcode-project use-profiles
           xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
 
-      - name: Publish to App Store Connect
+      - name: Upload to App Store
         script: |
           app-store-connect publish \
             --path build/ios/ipa/*.ipa \
