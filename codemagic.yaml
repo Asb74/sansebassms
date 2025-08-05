@@ -36,6 +36,9 @@ workflows:
           cd ios
           flutter build ios --simulator
           cd ..
+      - name: Copiar Flutter.podspec al lugar esperado por CocoaPods
+        script: |
+          cp ios/Flutter/Flutter.podspec $FLUTTER_ROOT/bin/cache/artifacts/engine/ios/
 
       - name: Install CocoaPods dependencies
         script: |
