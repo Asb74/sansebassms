@@ -24,7 +24,7 @@ workflows:
           flutter pub get
           flutter precache --ios
           flutter build ios --release --no-codesign
-
+          cp "$FLUTTER_ROOT/packages/flutter_tools/bin/templates/cocoapods/Flutter.podspec" "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/"
           cd ios
           ruby Flutter/podhelper.rb
           pod install
