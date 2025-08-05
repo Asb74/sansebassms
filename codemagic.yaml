@@ -11,7 +11,7 @@ workflows:
         APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
         APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
       groups:
-        - app_store_credentials # Grupo de variables con el .p8 en base64
+        - app_store_credentials
     triggering:
       events:
         - push
@@ -19,15 +19,11 @@ workflows:
         - pattern: main
           include: true
     scripts:
-      - name: Install dependencies
+      - name: Install dependencies and build
         script: |
           flutter pub get
           flutter precache --ios
           flutter build ios --release --no-codesign
-          cp "$FLUTTER_ROOT/packages/flutter_tools/bin/templates/cocoapods/Flutter.podspec" "$FLUTTER_ROOT/bin/cache/artifacts/engine/ios/"
-          cd ios
-          ruby Flutter/podhelper.rb
-          pod install
 
       - name: Decode private key from base64
         script: |
@@ -45,9 +41,8 @@ workflows:
             --private-key /tmp/AuthKey.p8
           keychain add-certificates
 
-      - name: Build .ipa
+      - name: Export .ipa
         script: |
-          flutter build ios --release --no-codesign
           xcode-project use-profiles
           xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
 
