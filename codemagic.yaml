@@ -28,9 +28,12 @@ workflows:
           source: true
 
     scripts:
-      - name: Get Flutter packages
+      - name: Prewarm Flutter engine and regenerate podspec
         script: |
+          flutter precache --ios
+          flutter clean
           flutter pub get
+          flutter build ios --debug
 
       - name: Install CocoaPods dependencies
         script: |
