@@ -13,12 +13,6 @@ workflows:
     integrations:
       app_store_connect: CodemagicKey
 
-    signing:
-      certificates:
-        - distribution_type: app_store
-          bundle_id: "com.example.sansebassms"
-          type: automatic  # Activar firma automática
-
     triggering:
       events:
         - push
