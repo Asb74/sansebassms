@@ -51,9 +51,9 @@ workflows:
         script: |
           xcode-project use-profiles
 
-      - name: Increment build number
-        script: |
-          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
+      #- name: Increment build number
+      #  script: |
+      #    agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
 
       - name: Build ipa for distribution
         script: |
