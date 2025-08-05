@@ -11,6 +11,11 @@ workflows:
         APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
         APP_STORE_CONNECT_PRIVATE_KEY: |
           LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRT1RhSkVDeE51QWQ5RDFkNFQKM1JIblNudmEvZTVWNnZab2JUcFdvdFRQS21nQ2dZSUtvWkl6ajBEQVFlaFJBTkNBQVJFVjJLczJYT0VkSWxDCklWU0wva1JkMGgzWXpNem01ZjRYclZzSWpHTDE1UCsxVkNkQ3F6U3B4M29rdlRVOE1weVlRR25PR0J6ODF5dVMCQkVRRy9GUDIKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=
+    code_signing:
+      automatic_code_signing:
+        app_store_connect:
+          credentials: CodemagicKey
+          team_id: 7QWJ8R3ZB5
     integrations:
       app_store_connect: CodemagicKey
 
