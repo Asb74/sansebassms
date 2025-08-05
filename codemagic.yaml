@@ -6,76 +6,72 @@ workflows:
       flutter: stable
       xcode: latest
       cocoapods: default
+      groups:
+        - app_store_credentials   # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER, APP_STORE_CONNECT_PRIVATE_KEY
       vars:
+        XCODE_WORKSPACE: "Runner.xcworkspace"
+        XCODE_SCHEME: "Runner"
         BUNDLE_ID: "com.example.sansebassms"
+        APP_STORE_APPLE_ID: 6749592028
         APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
         APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
-      groups:
-        - app_store_credentials
+
     triggering:
       events:
         - push
+        - tag
+        - pull_request
       branch_patterns:
-        - pattern: main
+        - pattern: "main"
           include: true
+          source: true
+
     scripts:
       - name: Get Flutter packages
         script: |
           flutter pub get
 
-      - name: Create Flutter.podspec manually if missing
-        script: |
-          cat <<'EOF' > "$PODSPEC_PATH"
-          Pod::Spec.new do |s|
-            s.name             = 'Flutter'
-            s.version          = '1.0.0'
-            s.summary          = 'Flutter Engine'
-            s.description      = <<-DESC
-              flutter engine framework
-            DESC
-            s.homepage         = 'https://flutter.dev'
-            s.license          = { :type => 'BSD' }
-            s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
-            s.source           = { :http => 'https://github.com/flutter/flutter' }
-            s.documentation_url = 'https://flutter.dev/docs'
-            s.platform         = :ios, '8.0'
-            s.vendored_frameworks = 'Flutter.framework'
-          end
-          EOF
-
-                    fi
-
-      - name: Install CocoaPods dependencies
-        script: |
-          cd ios
-          pod install
-          cd ..
-
-      - name: Set up keychain and code signing
+      - name: Set up keychain
         script: |
           keychain initialize
-          app-store-connect fetch-signing-files \
-            "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
+
+      - name: Fetch signing files
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
+
+      - name: Use system default keychain
+        script: |
           keychain add-certificates
 
-      - name: Build IPA
+      - name: Set up code signing settings on Xcode project
         script: |
-          flutter build ios --release --no-codesign
           xcode-project use-profiles
-          xcode-project build-ipa --workspace ios/Runner.xcworkspace --scheme Runner
 
-      - name: Publish to App Store Connect
+      - name: Increment build number
         script: |
-          app-store-connect publish \
-            --path build/ios/ipa/*.ipa \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
+          agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
+
+      - name: Build ipa for distribution
+        script: |
+          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
 
     artifacts:
       - build/ios/ipa/*.ipa
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: false
+
+      email:
+        recipients:
+          - antoniosazon@gmail.com
+        notify:
+          success: true
+          failure: true
