@@ -45,8 +45,8 @@ workflows:
                 s.platform         = :ios, '8.0'
                 s.vendored_frameworks = 'Flutter.framework'
               end
-              EOF
-                        fi
+            EOF
+          fi
 
       - name: Install CocoaPods dependencies
         script: |
