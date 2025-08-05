@@ -29,7 +29,7 @@ workflows:
           if [ ! -f "$PODSPEC_PATH" ]; then
             echo "⚠️ Flutter.podspec no encontrado, creando..."
             mkdir -p "$(dirname "$PODSPEC_PATH")"
-            cat > "$PODSPEC_PATH" <<EOF
+            cat <<EOF > "$PODSPEC_PATH"
 Pod::Spec.new do |s|
   s.name             = 'Flutter'
   s.version          = '1.0.0'
