@@ -33,7 +33,7 @@ workflows:
           flutter precache --ios
           flutter clean
           flutter pub get
-          flutter build ios --debug
+          flutter build ios --simulator
 
       - name: Install CocoaPods dependencies
         script: |
