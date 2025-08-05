@@ -8,12 +8,21 @@ workflows:
         BUNDLE_ID: "com.example.sansebassms"
         APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
         APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
-        APP_STORE_CONNECT_PRIVATE_KEY: "LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRT1RhSkVDeE51QWQ5RDFkNFQKM1JIblNudmEvZTVWNnZab2JUcFdvdFRQS21nQ2dZSUtvWkl6ajBEQVFlaFJBTkNBQVJFVjJLczJYT0VkSWxDCklWU0wva1JkMGgzWXpNem01ZjRYclZzSWpHTDE1UCsxVkNkQ3F6U3B4M29rdlRVOE1weVlRR25PR0J6ODF5dVMCQkVRRy9GUDIKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo="
+        APP_STORE_CONNECT_PRIVATE_KEY: |
+          LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCk1JR1RBZ0VBTUJNR0J5cUdTTTQ5QWdFR0NDcUdTTTQ5QXdFSEJIa3dkd0lCQVFRT1RhSkVDeE51QWQ5RDFkNFQKM1JIblNudmEvZTVWNnZab2JUcFdvdFRQS21nQ2dZSUtvWkl6ajBEQVFlaFJBTkNBQVJFVjJLczJYT0VkSWxDCklWU0wva1JkMGgzWXpNem01ZjRYclZzSWpHTDE1UCsxVkNkQ3F6U3B4M29rdlRVOE1weVlRR25PR0J6ODF5dVMCQkVRRy9GUDIKLS0tLS1FTkQgUFJJVkFURSBLRVktLS0tLQo=
     integrations:
       app_store_connect: CodemagicKey
+
+    signing:
+      certificates:
+        - distribution_type: app_store
+          bundle_id: "com.example.sansebassms"
+          type: automatic  # Activar firma automática
+
     triggering:
       events:
         - push
+
     scripts:
       - name: Pre-cache and clean
         script: |
@@ -53,3 +62,4 @@ workflows:
     publishing:
       app_store_connect:
         auth: integration
+        submit_to_testflight: true
