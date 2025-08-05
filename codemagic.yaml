@@ -7,22 +7,26 @@ workflows:
       xcode: latest
       cocoapods: default
       groups:
-        - app_store_credentials  # Este grupo debe contener 3 variables:
-                                 # APP_STORE_CONNECT_ISSUER_ID
-                                 # APP_STORE_CONNECT_KEY_IDENTIFIER
-                                 # APP_STORE_CONNECT_PRIVATE_KEY (.p8 en texto plano)
+        - app_store_credentials
+
       vars:
-        BUNDLE_ID: "com.example.sansebassms"
-        APP_STORE_APPLE_ID: 6749592028
         XCODE_WORKSPACE: "Runner.xcworkspace"
         XCODE_SCHEME: "Runner"
+        BUNDLE_ID: "com.example.sansebassms"
+        APP_STORE_APPLE_ID: 6749592028
+        APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
+        APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
+
     triggering:
       events:
         - push
+        - tag
+        - pull_request
       branch_patterns:
         - pattern: "main"
           include: true
           source: true
+
     scripts:
       - name: Get Flutter packages
         script: |
@@ -37,15 +41,13 @@ workflows:
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
+            --certificate-key "$CERTIFICATE_PRIVATE_KEY"
 
-      - name: Add signing certificates
+      - name: Use system default keychain
         script: |
           keychain add-certificates
 
-      - name: Set up Xcode project for codesigning
+      - name: Set up code signing settings on Xcode project
         script: |
           xcode-project use-profiles
 
@@ -53,7 +55,7 @@ workflows:
         script: |
           agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
 
-      - name: Build IPA
+      - name: Build ipa for distribution
         script: |
           xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
 
@@ -67,6 +69,7 @@ workflows:
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: false
+
       email:
         recipients:
           - antoniosazon@gmail.com
