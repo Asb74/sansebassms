@@ -23,7 +23,7 @@ workflows:
         script: |
           flutter pub get
           cd ios
-          ruby ../flutter_tools/bin/podhelper.rb
+          ruby Flutter/podhelper.rb
           pod install
 
       - name: Decode private key from base64
