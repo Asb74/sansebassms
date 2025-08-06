@@ -7,6 +7,7 @@ workflows:
       xcode: latest
       vars:
         APP_STORE_ID: 6749592028
+        BUNDLE_ID: com.example.sansebassms
       cocoapods: default
     triggering:
       events:
@@ -14,21 +15,18 @@ workflows:
       branch_patterns:
         - pattern: main
           include: true
-          source: true
     scripts:
-      - name: Clean and get dependencies
-        script: |
-          flutter clean
-          flutter pub get
+      - name: Flutter pub get
+        script: flutter pub get
       - name: Build IPA
-        script: |
-          flutter build ipa --release \
-            --build-name=1.0.0 \
-            --build-number=1
+        script: flutter build ipa --release --no-codesign
     artifacts:
       - build/ios/ipa/*.ipa
       - build/ios/ipa/*.dSYM.zip
     publishing:
       app_store_connect:
         authentication: integration
-        submit_to_app_store: true
+        app_id: $APP_STORE_ID
+        bundle_identifier: $BUNDLE_ID
+        submit_to_testflight: true
+        submit_to_app_store: false
