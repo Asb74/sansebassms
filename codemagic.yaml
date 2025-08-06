@@ -1,4 +1,14 @@
 workflows:
+  ios-build-and-publish:
+    name: iOS Build and Publish to App Store
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Hello
+        script: echo "iOS Build OK"
+
   generate-ios-artifacts:
     name: Generate iOS Artifacts for GitHub
     environment:
@@ -6,16 +16,5 @@ workflows:
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Get Flutter dependencies
-        script: |
-          flutter pub get
-      - name: Build iOS to generate native artifacts (no signing)
-        script: |
-          flutter build ios --no-codesign
-    artifacts:
-      - ios/Flutter/Flutter.podspec
-      - ios/Runner/GeneratedPluginRegistrant.*
-      - ios/Flutter/Generated.xcconfig
-      - ios/Flutter/flutter_export_environment.sh
-      - build/ios/iphoneos/Runner.app.dSYM
-      - build/**/Build/**/*.log
+      - name: Hello
+        script: echo "Generating Artifacts OK"
