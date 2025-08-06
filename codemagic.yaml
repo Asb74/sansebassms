@@ -1,0 +1,37 @@
+workflows:
+  build_ios_only:
+    name: Build iOS and publish to App Store
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      vars:
+        APP_STORE_ID: 6749592028  # <-- tu Apple ID de la app
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
+          source: true
+    scripts:
+      - name: Clean and get dependencies
+        script: |
+          flutter clean
+          flutter pub get
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --build-name=1.0.0 \
+            --build-number=1
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.dSYM.zip
+    publishing:
+      app_store_connect:
+        auth:
+          # Ya debes haber conectado tu cuenta Apple en Codemagic
+          # y seleccionado un key con "Manage Keys"
+          api_key: APP_STORE_API_KEY
+        submit_to_app_store: true
