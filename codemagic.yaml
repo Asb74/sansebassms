@@ -60,7 +60,8 @@ workflows:
       - name: Generate native iOS files (without cleaning)
         script: |
           flutter pub get
-          flutter build ios --debug
+          flutter packages pub run build_runner build
+        # flutter build ios --simulator
       - name: Install CocoaPods dependencies
         script: |
           cd ios
