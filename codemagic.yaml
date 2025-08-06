@@ -1,32 +1,20 @@
 workflows:
-  generate-ios-artifacts:
-    name: Generate iOS Artifacts for GitHub
+  build_app:
+    name: Build Android and iOS
+    max_build_duration: 60
     environment:
       flutter: stable
       xcode: latest
-      cocoapods: default
-
+      vars:
+        APP_STORE_ID: 6749592028
+        BUNDLE_ID: com.example.sansebassms # <-- usa el tuyo real
     scripts:
       - name: Get Flutter dependencies
-        script: |
-          flutter pub get
-
-      - name: Build iOS to generate native artifacts (no signing)
-        script: |
-          flutter build ios --no-codesign
-
-      - name: 🔍 Revisar contenido de ios/Flutter y ios/Runner
-        script: |
-          echo "--- Contenido de ios/Flutter/"
-          ls -la ios/Flutter || echo "⚠️ ios/Flutter no existe"
-          
-          echo "--- Contenido de ios/Runner/"
-          ls -la ios/Runner || echo "⚠️ ios/Runner no existe"
-
+        script: flutter pub get
+      - name: Build APK (Android)
+        script: flutter build apk --release
+      - name: Build IPA (iOS)
+        script: flutter build ipa --release --export-options-plist=ExportOptions.plist
     artifacts:
-      - ios/Flutter/Flutter.podspec
-      - ios/Flutter/Generated.xcconfig
-      - ios/Flutter/flutter_export_environment.sh
-      - ios/Runner/GeneratedPluginRegistrant.h
-      - ios/Runner/GeneratedPluginRegistrant.m
-      - build/ios/iphoneos/Runner.app.dSYM
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/ios/ipa/*.ipa
