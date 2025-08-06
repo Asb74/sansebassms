@@ -32,3 +32,4 @@ profile
 !Flutter/Flutter.podspec
 !Flutter/Generated.xcconfig
 !Runner/GeneratedPluginRegistrant.*
+!Flutter/podhelper.rb
