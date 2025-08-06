@@ -35,7 +35,28 @@ workflows:
         script: |
           flutter doctor -v
           flutter precache --ios
-          flutter build ios --debug # 💡 esto genera Flutter.podspec
+
+      - name: Crear Flutter.podspec manualmente
+        script: |
+          mkdir -p ios/Flutter
+          cat > ios/Flutter/Flutter.podspec <<EOF
+          Pod::Spec.new do |s|
+            s.name             = 'Flutter'
+            s.version          = '1.0.0'
+            s.summary          = 'Flutter Framework'
+            s.description      = <<-DESC
+                                 Flutter is a cross-platform framework for building apps.
+                                 DESC
+            s.homepage         = 'https://flutter.dev'
+            s.license          = { :type => 'BSD' }
+            s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
+            s.source           = { :path => '.' }
+            s.source_files     = 'Classes/**/*'
+            s.public_header_files = 'Classes/**/*.h'
+            s.frameworks       = 'Flutter'
+            s.platform         = :ios, '11.0'
+          end
+          EOF
 
       - name: Install CocoaPods dependencies
         script: |
@@ -78,6 +99,10 @@ workflows:
     artifacts:
       - build/ios/ipa/*.ipa
       - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
+      - build/ios/**/*.dSYM
+      - build/**/Build/**/*.log
+      - build/**/xcarchive/**/*.xcarchive
+
 
     publishing:
       app_store_connect:
