@@ -51,3 +51,4 @@ web/manifest.json
 !ios/Flutter/Flutter.podspec
 !ios/Flutter/Generated.xcconfig
 !ios/Runner/GeneratedPluginRegistrant.*
++ !ios/Runner.xcodeproj/
