@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       vars:
-        APP_STORE_ID: 6749592028  # <-- tu Apple ID de la app
+        APP_STORE_ID: 6749592028
       cocoapods: default
     triggering:
       events:
@@ -30,8 +30,5 @@ workflows:
       - build/ios/ipa/*.dSYM.zip
     publishing:
       app_store_connect:
-        auth:
-          # Ya debes haber conectado tu cuenta Apple en Codemagic
-          # y seleccionado un key con "Manage Keys"
-          api_key: APP_STORE_API_KEY
+        authentication: integration
         submit_to_app_store: true
