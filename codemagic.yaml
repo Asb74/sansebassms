@@ -32,34 +32,14 @@ workflows:
         script: | 
           flutter clean
           flutter pub get
-          flutter build ios --simulator
-
+          
       - name: Prewarm Flutter engine (necesario para Flutter.podspec)
         script: |
           flutter doctor -v
           flutter precache --ios
+          flutter build ios --simulator
 
-      - name: Crear Flutter.podspec manualmente
-        script: |
-          mkdir -p ios/Flutter
-          cat > ios/Flutter/Flutter.podspec <<EOF
-          Pod::Spec.new do |s|
-            s.name             = 'Flutter'
-            s.version          = '1.0.0'
-            s.summary          = 'Flutter Framework'
-            s.description      = <<-DESC
-                                 Flutter is a cross-platform framework for building apps.
-                                 DESC
-            s.homepage         = 'https://flutter.dev'
-            s.license          = { :type => 'BSD' }
-            s.author           = { 'Flutter Dev Team' => 'flutter-dev@googlegroups.com' }
-            s.source           = { :path => '.' }
-            s.source_files     = 'Classes/**/*'
-            s.public_header_files = 'Classes/**/*.h'
-            s.frameworks       = 'Flutter'
-            s.platform         = :ios, '11.0'
-          end
-          EOF
+
       #- name: Generate native iOS files (without cleaning)
       #  script: |
       #    flutter pub get
