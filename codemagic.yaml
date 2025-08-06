@@ -37,7 +37,7 @@ workflows:
         script: |
           flutter doctor -v
           flutter precache --ios
-          flutter build ios --simulator
+          
 
       - name: Copiar Flutter.podspec y GeneratedPluginRegistrant
         script: |
