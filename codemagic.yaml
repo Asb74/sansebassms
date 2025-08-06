@@ -1,13 +1,12 @@
 workflows:
   build_ios_only:
-    name: Build iOS and publish to App Store
+    name: Build iOS only
     max_build_duration: 60
     environment:
       flutter: stable
       xcode: latest
       vars:
-        APP_STORE_ID: 6749592028
-        BUNDLE_ID: com.example.sansebassms # ← tu bundle ID real aquí
+        BUNDLE_ID: com.example.sansebassms  # <-- Ajusta si es diferente
     scripts:
       - name: Get Flutter dependencies
         script: flutter pub get
@@ -15,7 +14,3 @@ workflows:
         script: flutter build ipa --release --export-options-plist=ExportOptions.plist
     artifacts:
       - build/ios/ipa/*.ipa
-    publishing:
-      app_store_connect:
-        apple_id: $APP_STORE_ID
-        bundle_id: $BUNDLE_ID
