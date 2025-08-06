@@ -29,7 +29,10 @@ workflows:
 
     scripts:
       - name: Get Flutter packages
-        script: flutter pub get
+        script: | 
+          flutter clean
+          flutter pub get
+          flutter build ios --simulator
 
       - name: Prewarm Flutter engine (necesario para Flutter.podspec)
         script: |
@@ -57,11 +60,10 @@ workflows:
             s.platform         = :ios, '11.0'
           end
           EOF
-      - name: Generate native iOS files (without cleaning)
-        script: |
-          flutter pub get
-          flutter packages pub run build_runner build
-        # flutter build ios --simulator
+      #- name: Generate native iOS files (without cleaning)
+      #  script: |
+      #    flutter pub get
+      #    flutter build ios --simulator
       - name: Install CocoaPods dependencies
         script: |
           cd ios
