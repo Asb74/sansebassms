@@ -57,7 +57,10 @@ workflows:
             s.platform         = :ios, '11.0'
           end
           EOF
-
+      - name: Generate native iOS files (without cleaning)
+        script: |
+          flutter pub get
+          flutter build ios --debug
       - name: Install CocoaPods dependencies
         script: |
           cd ios
