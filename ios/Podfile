@@ -5,7 +5,8 @@ use_modular_headers!
 
 target 'Runner' do
   # Usamos directamente el podspec local que ya tienes en ios/Flutter
-  pod 'Flutter', :podspec => File.join(__dir__, 'Flutter', 'Flutter.podspec')
+  pod 'Flutter', :path => File.join(__dir__, 'Flutter')
+
 
   # Puedes añadir otros pods aquí si es necesario
 end
