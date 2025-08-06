@@ -30,12 +30,12 @@ workflows:
     scripts:
       - name: Get Flutter packages
         script: flutter pub get
+
       - name: Prewarm Flutter engine (necesario para Flutter.podspec)
         script: |
           flutter doctor -v
           flutter precache --ios
-
-      
+          flutter build ios --debug # 💡 esto genera Flutter.podspec
 
       - name: Install CocoaPods dependencies
         script: |
@@ -67,14 +67,6 @@ workflows:
         script: |
           xcode-project use-profiles
 
-      # Nuevo paso: asegura que los archivos nativos estén generados antes de compilar
-      - name: Ensure GeneratedPluginRegistrant is created
-        script: |
-          flutter clean
-          flutter pub get
-          flutter build ios --debug
-
-      # Paso opcional, desactivado por ahora
       # - name: Increment build number
       #   script: |
       #     agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
