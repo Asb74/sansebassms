@@ -6,7 +6,7 @@ workflows:
       flutter: stable
       xcode: latest
       vars:
-        BUNDLE_ID: com.example.sansebassms  # <-- Ajusta si es diferente
+        BUNDLE_ID: com.example.sansebassms
     scripts:
       - name: Get Flutter dependencies
         script: flutter pub get
@@ -14,3 +14,7 @@ workflows:
         script: flutter build ipa --release --export-options-plist=ExportOptions.plist
     artifacts:
       - build/ios/ipa/*.ipa
+    code_signing:
+      certificates:
+        - certificate_name: ios_distribution  # <-- este es el nombre que diste al guardar el certificado
+          set_up_automatic_code_signing: true
