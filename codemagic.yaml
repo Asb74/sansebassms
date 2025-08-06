@@ -1,20 +1,21 @@
 workflows:
-  build_app:
-    name: Build Android and iOS
+  build_ios_only:
+    name: Build iOS and publish to App Store
     max_build_duration: 60
     environment:
       flutter: stable
       xcode: latest
       vars:
         APP_STORE_ID: 6749592028
-        BUNDLE_ID: com.example.sansebassms # <-- usa el tuyo real
+        BUNDLE_ID: com.example.sansebassms # ← tu bundle ID real aquí
     scripts:
       - name: Get Flutter dependencies
         script: flutter pub get
-      - name: Build APK (Android)
-        script: flutter build apk --release
-      - name: Build IPA (iOS)
+      - name: Build IPA
         script: flutter build ipa --release --export-options-plist=ExportOptions.plist
     artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
       - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        apple_id: $APP_STORE_ID
+        bundle_id: $BUNDLE_ID
