@@ -6,7 +6,8 @@ def flutter_install_all_ios_pods(flutter_application_path)
 end
 
 def install_flutter_engine_pod
-  pod 'Flutter', :path => File.join(ENV['FLUTTER_ROOT'], 'bin', 'cache', 'artifacts', 'engine', 'ios')
+  # Usa el Flutter.podspec que ya está en tu repo en ios/Flutter/
+  pod 'Flutter', :path => File.expand_path('../Flutter', __dir__)
 end
 
 def install_flutter_plugin_pods(flutter_application_path)
