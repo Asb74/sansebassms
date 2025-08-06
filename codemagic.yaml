@@ -29,21 +29,46 @@ workflows:
 
     scripts:
       - name: Get Flutter packages
-        script: | 
+        script: |
           flutter clean
           flutter pub get
-          
+
       - name: Prewarm Flutter engine (necesario para Flutter.podspec)
         script: |
           flutter doctor -v
           flutter precache --ios
           flutter build ios --simulator
 
+      - name: Copiar Flutter.podspec y GeneratedPluginRegistrant
+        script: |
+          echo "📁 Copiando archivos necesarios para CocoaPods"
 
-      #- name: Generate native iOS files (without cleaning)
-      #  script: |
-      #    flutter pub get
-      #    flutter build ios --simulator
+          # Crear ruta que espera CocoaPods
+          mkdir -p /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
+
+          # Copiar Flutter.podspec
+          cp ios/Flutter/Flutter.podspec /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/Flutter.podspec
+
+          # Copiar otros archivos útiles si existen
+          if [ -f ios/Flutter/Flutter.xcconfig ]; then
+            cp ios/Flutter/Flutter.xcconfig /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
+          fi
+          if [ -f ios/Flutter/Generated.xcconfig ]; then
+            cp ios/Flutter/Generated.xcconfig /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
+          fi
+          if [ -d ios/Flutter/App.framework ]; then
+            cp -R ios/Flutter/App.framework /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
+          fi
+          if [ -d ios/Flutter/Flutter.framework ]; then
+            cp -R ios/Flutter/Flutter.framework /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
+          fi
+
+          # Validar existencia de GeneratedPluginRegistrant
+          if [ ! -f ios/Runner/GeneratedPluginRegistrant.m ] || [ ! -f ios/Runner/GeneratedPluginRegistrant.h ]; then
+            echo "❌ Faltan archivos GeneratedPluginRegistrant.{m,h} en ios/Runner/"
+            exit 1
+          fi
+
       - name: Install CocoaPods dependencies
         script: |
           cd ios
@@ -88,7 +113,6 @@ workflows:
       - build/ios/**/*.dSYM
       - build/**/Build/**/*.log
       - build/**/xcarchive/**/*.xcarchive
-
 
     publishing:
       app_store_connect:

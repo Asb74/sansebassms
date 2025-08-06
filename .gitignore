@@ -1,47 +1,53 @@
-Android# Flutter/Dart/Pub related
+# Flutter & Dart
 .dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
 .packages
 .pub-cache/
 build/
-flutter_*.png
+coverage/
+.melos_tool/
 
 # Android
 android/.gradle/
-android/app/debug/
-android/app/profile/
-android/app/release/
+android/app/build/
 android/local.properties
 
-# iOS
-ios/Pods/
-ios/.symlinks/
-ios/Flutter/Flutter.framework
-#ios/Flutter/Flutter.podspec
-ios/Flutter/Generated.xcconfig
-ios/.generated/
-
 # Xcode
-*.xcworkspace
-*.xcuserstate
-*.xcuserdatad
-*.moved-aside
-DerivedData/
-.idea/
+ios/Flutter/ephemeral/
+ios/Flutter/App.framework.dSYM
+ios/Flutter/Flutter.framework.dSYM
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/DerivedData/
+ios/.symlinks/
+ios/build/
+ios/profile
+ios/xcuserdata/
 *.pbxuser
-!default.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.xcuserstate
 
-# VS Code
-.vscode/
-
-# Mac
-.DS_Store
+# MacOS
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Runner.xcworkspace/
+macos/build/
 
 # Web
-web/.dart_tool/
+web/manifest.json
 
-# Others
+# Other
+.idea/
+.vscode/
+*.iml
 *.log
-*.lock
-*.tmp
-*.bak
-*.swp
+
+# Exceptions: allow necessary iOS artifacts for Codemagic
+!ios/Flutter/Flutter.framework
+!ios/Flutter/App.framework
+!ios/Flutter/Flutter.podspec
+!ios/Flutter/Generated.xcconfig
+!ios/Runner/GeneratedPluginRegistrant.*
