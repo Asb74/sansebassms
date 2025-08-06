@@ -1,129 +1,21 @@
 workflows:
-  ios-build-and-publish:
-    name: iOS Build and Publish to App Store
-    max_build_duration: 45
+  generate-ios-artifacts:
+    name: Generate iOS Artifacts for GitHub
     environment:
       flutter: stable
       xcode: latest
       cocoapods: default
-      groups:
-        - app_store_credentials
-
-      vars:
-        XCODE_WORKSPACE: "ios/Runner.xcworkspace"
-        XCODE_SCHEME: "Runner"
-        BUNDLE_ID: "com.example.sansebassms"
-        APP_STORE_APPLE_ID: 6749592028
-        APP_STORE_CONNECT_ISSUER_ID: "0bae98e1-a493-4ddc-ab5d-cdb87b225a1b"
-        APP_STORE_CONNECT_KEY_IDENTIFIER: "43Z3JZ75L6"
-
-    triggering:
-      events:
-        - push
-        - tag
-        - pull_request
-      branch_patterns:
-        - pattern: "main"
-          include: true
-          source: true
-
     scripts:
-      - name: Get Flutter packages
+      - name: Get Flutter dependencies
         script: |
-          flutter clean
           flutter pub get
-
-      - name: Prewarm Flutter engine (necesario para Flutter.podspec)
+      - name: Build iOS to generate native artifacts (no signing)
         script: |
-          flutter doctor -v
-          flutter precache --ios
-          
-
-      - name: Copiar Flutter.podspec y GeneratedPluginRegistrant
-        script: |
-          echo "📁 Copiando archivos necesarios para CocoaPods"
-
-          # Crear ruta que espera CocoaPods
-          mkdir -p /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
-
-          # Copiar Flutter.podspec
-          cp ios/Flutter/Flutter.podspec /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/Flutter.podspec
-
-          # Copiar otros archivos útiles si existen
-          if [ -f ios/Flutter/Flutter.xcconfig ]; then
-            cp ios/Flutter/Flutter.xcconfig /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
-          fi
-          if [ -f ios/Flutter/Generated.xcconfig ]; then
-            cp ios/Flutter/Generated.xcconfig /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
-          fi
-          if [ -d ios/Flutter/App.framework ]; then
-            cp -R ios/Flutter/App.framework /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
-          fi
-          if [ -d ios/Flutter/Flutter.framework ]; then
-            cp -R ios/Flutter/Flutter.framework /Users/builder/programs/flutter/bin/cache/artifacts/engine/ios/
-          fi
-
-          # Validar existencia de GeneratedPluginRegistrant
-          if [ ! -f ios/Runner/GeneratedPluginRegistrant.m ] || [ ! -f ios/Runner/GeneratedPluginRegistrant.h ]; then
-            echo "❌ Faltan archivos GeneratedPluginRegistrant.{m,h} en ios/Runner/"
-            exit 1
-          fi
-
-      - name: Install CocoaPods dependencies
-        script: |
-          cd ios
-          pod install
-          cd ..
-
-      - name: Check ios/ contents
-        script: |
-          echo "Contenido de ios/"
-          ls -la ios
-
-      - name: Set up keychain
-        script: |
-          keychain initialize
-
-      - name: Fetch signing files
-        script: |
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create \
-            --certificate-key "$CERTIFICATE_PRIVATE_KEY"
-
-      - name: Use system default keychain
-        script: |
-          keychain add-certificates
-
-      - name: Set up code signing settings on Xcode project
-        script: |
-          xcode-project use-profiles
-
-      # - name: Increment build number
-      #   script: |
-      #     agvtool new-version -all $(($(app-store-connect get-latest-testflight-build-number "$APP_STORE_APPLE_ID") + 1))
-
-      - name: Build ipa for distribution
-        script: |
-          xcode-project build-ipa --workspace "$XCODE_WORKSPACE" --scheme "$XCODE_SCHEME"
-
+          flutter build ios --no-codesign
     artifacts:
-      - build/ios/ipa/*.ipa
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
-      - build/ios/**/*.dSYM
+      - ios/Flutter/Flutter.podspec
+      - ios/Runner/GeneratedPluginRegistrant.*
+      - ios/Flutter/Generated.xcconfig
+      - ios/Flutter/flutter_export_environment.sh
+      - build/ios/iphoneos/Runner.app.dSYM
       - build/**/Build/**/*.log
-      - build/**/xcarchive/**/*.xcarchive
-
-    publishing:
-      app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        submit_to_testflight: false
-
-      email:
-        recipients:
-          - amtoniosazon@gmail.com
-        notify:
-          success: true
-          failure: true
