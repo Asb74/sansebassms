@@ -1,6 +1,6 @@
 require 'json'
 
-def install_all_flutter_pods(flutter_application_path)
+def flutter_install_all_ios_pods(flutter_application_path)
   install_flutter_engine_pod
   install_flutter_plugin_pods(flutter_application_path)
 end
