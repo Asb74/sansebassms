@@ -1,23 +1,6 @@
-require 'json'
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), Dir.pwd)
 
-def install_all_flutter_pods(flutter_application_path)
-  install_flutter_engine_pod
-  install_flutter_plugin_pods(flutter_application_path)
-end
+flutter_root = File.expand_path('..', Dir.pwd)
+flutter_application_path = File.expand_path('..', __dir__)
 
-def install_flutter_engine_pod
-  pod 'Flutter', :path => File.join(ENV['FLUTTER_ROOT'], 'bin', 'cache', 'artifacts', 'engine', 'ios')
-
-end
-
-def install_flutter_plugin_pods(flutter_application_path)
-  plugin_manifest_path = File.join(flutter_application_path, '.flutter-plugins-dependencies')
-  return unless File.exist?(plugin_manifest_path)
-
-  plugin_manifest = JSON.parse(File.read(plugin_manifest_path))
-  plugin_manifest['plugins']['ios'].each do |plugin|
-    plugin_name = plugin['name']
-    plugin_path = plugin['path']
-    pod plugin_name, :path => File.expand_path(plugin_path, flutter_application_path)
-  end
-end
+flutter_install_all_ios_pods(flutter_application_path)

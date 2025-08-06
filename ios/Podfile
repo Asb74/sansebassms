@@ -3,12 +3,10 @@ platform :ios, '15.0'
 use_frameworks! :linkage => :static
 use_modular_headers!
 
+load File.join(__dir__, 'Flutter', 'podhelper.rb')
+
 target 'Runner' do
-  # Usamos directamente el podspec local que ya tienes en ios/Flutter
-  pod 'Flutter', :path => File.join(__dir__, 'Flutter')
-
-
-  # Puedes añadir otros pods aquí si es necesario
+  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
 end
 
 post_install do |installer|
