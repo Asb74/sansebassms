@@ -25,6 +25,7 @@ ios/build/
 ios/.symlinks/
 ios/DerivedData/
 ios/Runner.xcworkspace/
+ios/Runner.xcodeproj/project.xcworkspace
 
 # Permitir solo podhelper.rb
 !ios/Flutter/podhelper.rb
