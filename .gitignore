@@ -13,22 +13,22 @@ android/.gradle/
 android/app/build/
 android/local.properties
 
-# Xcode
+# iOS build artifacts
 ios/Flutter/ephemeral/
-ios/Flutter/App.framework.dSYM
-ios/Flutter/Flutter.framework.dSYM
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
 ios/Pods/
-ios/Runner.xcworkspace/
-ios/DerivedData/
-ios/.symlinks/
 ios/build/
-ios/profile
-ios/xcuserdata/
-*.pbxuser
-*.mode1v3
-*.mode2v3
-*.perspectivev3
-*.xcuserstate
+ios/.symlinks/
+ios/DerivedData/
+ios/Runner.xcworkspace/
+
+# Permitir solo podhelper.rb
+!ios/Flutter/podhelper.rb
+
 
 # MacOS
 macos/Flutter/ephemeral/
