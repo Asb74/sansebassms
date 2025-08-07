@@ -6,8 +6,8 @@ use_modular_headers!
 require File.expand_path(File.join('Flutter', 'podhelper.rb'), __dir__)
 
 target 'Runner' do
-  #flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
-  flutter_install_all_plugin_pods(File.dirname(File.realpath(__FILE__)))
+  flutter_install_all_ios_pods(File.dirname(File.realpath(__FILE__)))
+  #flutter_install_all_plugin_pods(File.dirname(File.realpath(__FILE__)))
 
 end
 
