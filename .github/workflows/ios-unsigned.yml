@@ -1,60 +1,54 @@
-name: iOS Build (Flutter, unsigned)
+name: Build iOS Unsigned IPA
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  build-ios:
+  build:
     runs-on: macos-latest
-
     steps:
-      # 1. Descargar el código
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
 
-      # 2. Instalar Flutter estable
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: 'stable'
+          channel: 'stable'
 
-      # 3. Verificar versión de Flutter
-      - name: Flutter version
-        run: flutter --version
+      - name: Cache Flutter packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pub-cache
+          key: flutter-pub-${{ hashFiles('**/pubspec.lock') }}
 
-      # 4. Obtener dependencias de Dart/Flutter
-      - name: Flutter pub get
+      - name: Cache CocoaPods
+        uses: actions/cache@v3
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+            ~/Library/Developer/Xcode/DerivedData
+          key: pods-${{ hashFiles('ios/Podfile.lock') }}
+
+      - name: Install dependencies
         run: flutter pub get
 
-      # 5. Instalar CocoaPods
-      - name: Ensure CocoaPods
+      - name: Install CocoaPods (no repo update)
         run: |
-          sudo gem install cocoapods -N || true
-          pod --version
+          cd ios
+          pod install
+          cd ..
 
-      # 6. Limpiar y reinstalar pods con el nuevo Podfile
-      - name: Clean & reinstall pods
-        run: |
-          flutter clean
-          rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.framework
-          flutter pub get
-          cd ios && pod install --repo-update && cd ..
-
-      # (Opcional) Mostrar el Podfile y pods instalados para debug
-      - name: Show Podfile & pod list
-        run: |
-          sed -n '1,200p' ios/Podfile
-          cd ios && pod list
-
-      # 7. Construir IPA sin firmar
-      - name: Build IPA (no codesign)
+      - name: Build unsigned IPA
         run: flutter build ipa --release --no-codesign
 
-      # 8. Subir el .ipa como artefacto descargable
-      - name: Upload artifact (.ipa)
-        uses: actions/upload-artifact@v4
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v3
         with:
-          name: ios-ipa-unsigned
+          name: ios-unsigned
           path: build/ios/ipa/*.ipa
