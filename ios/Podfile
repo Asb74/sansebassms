@@ -29,7 +29,7 @@ target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # 🔹 Pin de módulos Firebase a 12.0.0 para evitar problemas con Swift 6
+  # 🔒 Fijar Firebase iOS SDK a 12.0.0 (evita @sending / Swift 6)
   pod 'Firebase/Core', '12.0.0'
   pod 'Firebase/Auth', '12.0.0'
   pod 'Firebase/Firestore', '12.0.0'
@@ -41,8 +41,6 @@ target 'Runner' do
   pod 'Firebase/InAppMessaging', '12.0.0'
   pod 'Firebase/ABTesting', '12.0.0'
   pod 'Firebase/AppCheck', '12.0.0'
-
-  # 🔹 FirebaseSharedSwift como pod independiente
   pod 'FirebaseSharedSwift', '12.0.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
@@ -50,7 +48,9 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    # Ajustes imprescindibles de Flutter
     flutter_additional_ios_build_settings(target)
+    # Fuerza compatibilidad con iOS 15 y Swift 5.9
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['SWIFT_VERSION'] = '5.9'

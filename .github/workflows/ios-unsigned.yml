@@ -1,4 +1,4 @@
-name: Build iOS IPA (Unsigned, stable)
+name: Build iOS IPA (Unsigned, locked)
 
 on:
   workflow_dispatch:
@@ -6,10 +6,14 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-ios:
-    runs-on: macos-14     # Xcode 15 (Swift 5.9)
-    timeout-minutes: 30
+    runs-on: macos-14   # Xcode 15 (Swift 5.9)
+    timeout-minutes: 40
 
     steps:
       - name: Checkout
@@ -21,14 +25,16 @@ jobs:
           flutter-version: '3.32.7'
           channel: stable
 
-      - name: Flutter pub get
+      - name: Flutter pub get (lock respected)
         run: flutter pub get
 
-      # Limpieza dura de Pods para asegurar que coja 12.0.0
-      - name: Clean Pods hard (first run)
+      # Primera vez: repo update para bajar podspecs
+      - name: Install CocoaPods (first run)
         run: |
-          rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.framework
-          cd ios && pod repo update && pod install && cd ..
+          cd ios
+          pod repo update
+          pod install
+          cd ..
 
       - name: Build IPA (unsigned)
         run: flutter build ipa --release --no-codesign
