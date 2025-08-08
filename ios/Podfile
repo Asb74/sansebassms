@@ -1,7 +1,5 @@
-# Podfile para proyecto Flutter con iOS 15.0
+# Podfile para Flutter con iOS 15.0
 platform :ios, '15.0'
-
-# Desactiva warnings de CocoaPods que pueden llenar el log
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -13,13 +11,13 @@ project 'Runner', {
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} no existe. Corre 'flutter pub get' primero."
+    raise "Generated.xcconfig must exist. Run 'flutter pub get' first."
   end
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
   end
-  raise "FLUTTER_ROOT no encontrado en #{generated_xcode_build_settings_path}."
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}."
 end
 
 require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
@@ -27,16 +25,20 @@ require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'b
 flutter_ios_podfile_setup
 
 target 'Runner' do
+  # Recomendado por Flutter; si te diera problemas, podemos quitarlo.
   use_frameworks! :linkage => :static
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
-# Fuerza el mínimo de iOS 15.0 en todos los Pods
 post_install do |installer|
-  installer.pods_project.targets.each do |t|
-    t.build_configurations.each do |config|
+  installer.pods_project.targets.each do |target|
+    # 👇 ESTA LÍNEA ES CLAVE para que los plugins encuentren el módulo 'Flutter'
+    flutter_additional_ios_build_settings(target)
+
+    # iOS mínimo a 15.0 por si algún pod insiste
+    target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
