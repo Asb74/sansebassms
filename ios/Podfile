@@ -32,11 +32,11 @@ target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # 🔹 Fuerza Firebase iOS SDK >=12.1.0
-  pod 'Firebase/Core', '>= 12.1.0'
-  pod 'Firebase/Auth', '>= 12.1.0'
-  pod 'Firebase/Firestore', '>= 12.1.0'
-  pod 'Firebase/Messaging', '>= 12.1.0'
+  # 🔹 Fijamos Firebase a 12.0.0 para alinear con firebase_auth 6.0.0
+  pod 'Firebase/CoreOnly', '12.0.0'
+  pod 'Firebase/Auth', '12.0.0'
+  pod 'Firebase/Firestore', '12.0.0'
+  pod 'Firebase/Messaging', '12.0.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
