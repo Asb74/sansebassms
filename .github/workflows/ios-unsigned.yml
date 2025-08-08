@@ -1,4 +1,4 @@
-name: Build iOS IPA (Unsigned)
+name: Build iOS Unsigned IPA
 
 on:
   workflow_dispatch:
@@ -10,22 +10,13 @@ jobs:
   build-ios:
     runs-on: macos-latest
     steps:
-      - name: Checkout code
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.7' # Igual que local
-          channel: 'stable'
-
-      - name: Cache Flutter packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.pub-cache
-            ios/Pods
-          key: ${{ runner.os }}-flutter-${{ hashFiles('pubspec.yaml') }}
+          flutter-version: '3.32.7'
 
       - name: Install dependencies
         run: flutter pub get
@@ -36,7 +27,7 @@ jobs:
           pod install --no-repo-update
           cd ..
 
-      - name: Build IPA (Unsigned)
+      - name: Build IPA (unsigned)
         run: flutter build ipa --release --no-codesign
 
       - name: Upload IPA artifact

@@ -32,7 +32,7 @@ target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # 🔹 Fijamos Firebase a 12.0.0 para alinear con firebase_auth 6.0.0
+  # 🔹 Fijamos Firebase iOS SDK a 12.0.0 para evitar errores de compilación en FirebaseSharedSwift
   pod 'Firebase/CoreOnly', '12.0.0'
   pod 'Firebase/Auth', '12.0.0'
   pod 'Firebase/Firestore', '12.0.0'
@@ -45,6 +45,7 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
+      # iOS mínimo compatible
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
     end
   end
