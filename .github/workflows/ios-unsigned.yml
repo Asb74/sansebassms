@@ -6,50 +6,67 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 30
+
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: 'stable'
-          channel: 'stable'
+          channel: stable
 
-      - name: Cache Flutter packages
-        uses: actions/cache@v3
+      - name: Flutter version
+        run: flutter --version
+
+      - name: Install dependencies (pub get)
+        run: flutter pub get
+
+      - name: Cache pub
+        uses: actions/cache@v4
         with:
           path: |
             ~/.pub-cache
-          key: flutter-pub-${{ hashFiles('**/pubspec.lock') }}
+            **/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
 
       - name: Cache CocoaPods
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: |
             ios/Pods
+            ios/Podfile.lock
             ~/Library/Caches/CocoaPods
-            ~/Library/Developer/Xcode/DerivedData
-          key: pods-${{ hashFiles('ios/Podfile.lock') }}
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
 
-      - name: Install dependencies
-        run: flutter pub get
+      - name: Ensure CocoaPods
+        run: |
+          sudo gem install cocoapods -N || true
+          pod --version
 
-      - name: Install CocoaPods (no repo update)
+      - name: Install pods (sin repo update)
         run: |
           cd ios
           pod install
           cd ..
 
-      - name: Build unsigned IPA
+      - name: Build IPA (no codesign)
         run: flutter build ipa --release --no-codesign
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4   # <-- actualizado a v4
         with:
-          name: ios-unsigned
+          name: ios-ipa-unsigned
           path: build/ios/ipa/*.ipa
