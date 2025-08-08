@@ -12,7 +12,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-14   # Forzar Xcode 15 y Swift 5.9
     timeout-minutes: 30
 
     steps:
@@ -56,7 +56,7 @@ jobs:
           sudo gem install cocoapods -N || true
           pod --version
 
-      - name: Install pods (no repo update)
+      - name: Install pods (sin repo update)
         run: |
           cd ios
           pod install

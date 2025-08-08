@@ -1,6 +1,9 @@
 platform :ios, '15.0'
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# Forzar versión estable y compatible de Firebase (evita error Swift)
+$FirebaseSDKVersion = '10.24.0'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
@@ -37,6 +40,12 @@ target 'Runner' do
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  # Forzar Firebase estable en cada módulo
+  pod 'Firebase/Core', $FirebaseSDKVersion
+  pod 'Firebase/Auth', $FirebaseSDKVersion
+  pod 'Firebase/Messaging', $FirebaseSDKVersion
+  pod 'Firebase/Firestore', $FirebaseSDKVersion
 end
 
 post_install do |installer|
