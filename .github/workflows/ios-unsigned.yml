@@ -1,72 +1,39 @@
-name: Build iOS Unsigned IPA
+name: Build iOS unsigned IPA
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - main
-
-concurrency:
-  group: ios-build-${{ github.ref }}
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: macos-14   # Forzar Xcode 15 y Swift 5.9
-    timeout-minutes: 30
-
+  build-ios:
+    runs-on: macos-14
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.22.2' # o el que uses localmente
           channel: stable
 
-      - name: Flutter version
-        run: flutter --version
-
-      - name: Install dependencies (pub get)
+      - name: Install dependencies
         run: flutter pub get
 
-      - name: Cache pub
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.pub-cache
-            **/.dart_tool
-          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pub-
-
-      - name: Cache CocoaPods
-        uses: actions/cache@v4
-        with:
-          path: |
-            ios/Pods
-            ios/Podfile.lock
-            ~/Library/Caches/CocoaPods
-          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-pods-
-
-      - name: Ensure CocoaPods
-        run: |
-          sudo gem install cocoapods -N || true
-          pod --version
-
-      - name: Install pods (sin repo update)
+      - name: Pod repo update (solo primera vez o si cambias Podfile)
         run: |
           cd ios
-          pod install
+          pod repo update
           cd ..
 
       - name: Build IPA (no codesign)
-        run: flutter build ipa --release --no-codesign
+        run: |
+          flutter build ipa --release --no-codesign
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa-unsigned
+          name: ios-unsigned
           path: build/ios/ipa/*.ipa

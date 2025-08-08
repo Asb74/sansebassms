@@ -8,11 +8,9 @@ project 'Runner', {
 }
 
 def flutter_root
-  # 1) Preferir la variable del runner (macOS) si existe
   env_root = ENV['FLUTTER_ROOT']
   return env_root unless env_root.nil? || env_root.empty?
 
-  # 2) Fallback: leer Generated.xcconfig y normalizar separadores de Windows
   generated = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated)
     raise "#{generated} no existe. Ejecuta 'flutter pub get' primero."
@@ -20,8 +18,7 @@ def flutter_root
   File.foreach(generated) do |line|
     m = line.match(/FLUTTER_ROOT\=(.*)/)
     if m
-      path = m[1].strip.gsub('\\', '/')
-      return path
+      return m[1].strip.gsub('\\', '/')
     end
   end
   raise "FLUTTER_ROOT no encontrado en #{generated}."
@@ -32,9 +29,14 @@ require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'b
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  # Si diera problemas de linking, elimina la siguiente línea:
   use_frameworks! :linkage => :static
   use_modular_headers!
+
+  # 🔹 Fuerza Firebase iOS SDK >=12.1.0
+  pod 'Firebase/Core', '>= 12.1.0'
+  pod 'Firebase/Auth', '>= 12.1.0'
+  pod 'Firebase/Firestore', '>= 12.1.0'
+  pod 'Firebase/Messaging', '>= 12.1.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
