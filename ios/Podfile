@@ -17,43 +17,36 @@ def flutter_root
   end
   File.foreach(generated) do |line|
     m = line.match(/FLUTTER_ROOT\=(.*)/)
-    return m[1].strip.gsub('\\', '/') if m
+    if m
+      return m[1].strip.gsub('\\', '/')
+    end
   end
   raise "FLUTTER_ROOT no encontrado en #{generated}."
 end
 
 require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # 🔒 Fijar Firebase iOS SDK a 12.0.0 (evita @sending / Swift 6)
-  pod 'Firebase/Core', '12.0.0'
-  pod 'Firebase/Auth', '12.0.0'
-  pod 'Firebase/Firestore', '12.0.0'
-  pod 'Firebase/Messaging', '12.0.0'
-  pod 'Firebase/Installations', '12.0.0'
-  pod 'Firebase/Analytics', '12.0.0'
-  pod 'Firebase/Crashlytics', '12.0.0'
-  pod 'Firebase/RemoteConfig', '12.0.0'
-  pod 'Firebase/InAppMessaging', '12.0.0'
-  pod 'Firebase/ABTesting', '12.0.0'
-  pod 'Firebase/AppCheck', '12.0.0'
-  pod 'FirebaseSharedSwift', '12.0.0'
+  # 🔹 Fuerza Firebase iOS SDK >= 12.1.0 para evitar bug en Swift 6
+  pod 'Firebase/Core', '>= 12.1.0'
+  pod 'Firebase/Auth', '>= 12.1.0'
+  pod 'Firebase/Firestore', '>= 12.1.0'
+  pod 'Firebase/Messaging', '>= 12.1.0'
+  pod 'Firebase/SharedSwift', '>= 12.1.0'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    # Ajustes imprescindibles de Flutter
     flutter_additional_ios_build_settings(target)
-    # Fuerza compatibilidad con iOS 15 y Swift 5.9
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-      config.build_settings['SWIFT_VERSION'] = '5.9'
     end
   end
 end
