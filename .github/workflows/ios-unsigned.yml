@@ -1,4 +1,4 @@
-name: Build iOS Unsigned IPA
+name: Build iOS IPA (Unsigned, stable)
 
 on:
   workflow_dispatch:
@@ -8,30 +8,32 @@ on:
 
 jobs:
   build-ios:
-    runs-on: macos-latest
+    runs-on: macos-14     # Xcode 15 (Swift 5.9)
+    timeout-minutes: 30
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.7'
+          channel: stable
 
-      - name: Install dependencies
+      - name: Flutter pub get
         run: flutter pub get
 
-      - name: Install CocoaPods
+      # Limpieza dura de Pods para asegurar que coja 12.0.0
+      - name: Clean Pods hard (first run)
         run: |
-          cd ios
-          pod install --no-repo-update
-          cd ..
+          rm -rf ios/Pods ios/Podfile.lock ios/Flutter/Flutter.framework
+          cd ios && pod repo update && pod install && cd ..
 
       - name: Build IPA (unsigned)
         run: flutter build ipa --release --no-codesign
 
-
-      - name: Upload IPA artifact
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: ios-ipa-unsigned
