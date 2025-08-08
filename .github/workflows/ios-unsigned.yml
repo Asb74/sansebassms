@@ -1,0 +1,61 @@
+name: iOS Build (Flutter, unsigned)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          # Si prefieres fijar versión exacta:
+          # flutter-version: '3.22.2'
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      # (Opcional) Cache de dependencias de Dart/Flutter
+      - name: Cache pub
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            **/.dart_tool
+          key: ${{ runner.os }}-pub-${{ hashFiles('**/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      - name: Ensure CocoaPods
+        run: |
+          sudo gem install cocoapods -N || true
+          pod --version
+
+      # (Opcional) Limpieza y reinstalación de pods si cambiaste el Podfile recientemente
+      # - name: Clean & reinstall pods
+      #   run: |
+      #     flutter clean
+      #     rm -rf ios/Pods ios/Podfile.lock
+      #     flutter pub get
+      #     cd ios && pod repo update && pod install && cd ..
+
+      # IMPORTANTE: en ios/Podfile asegúrate de tener:
+      #   platform :ios, '15.0'
+      # y (recomendado) un post_install que fuerce IPHONEOS_DEPLOYMENT_TARGET = '15.0'
+
+      - name: Build IPA (no codesign)
+        run: flutter build ipa --release --no-codesign
+
+      - name: Upload artifact (.ipa)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-unsigned
+          path: build/ios/ipa/*.ipa
