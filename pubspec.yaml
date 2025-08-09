@@ -1,8 +1,6 @@
 name: sansebassms
 description: "A new Flutter project."
-
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -11,20 +9,22 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  firebase_core: ^3.10.0
-  cloud_firestore: ^5.5.0
-  firebase_auth: ^5.3.0
-  firebase_messaging: ^15.1.0
-  shared_preferences: ^2.2.3
-  permission_handler: ^11.3.1
-  cupertino_icons: ^1.0.8
-  flutter_launcher_icons: ^0.14.4
-  flutter_local_notifications: ^17.2.2
+
+  firebase_core: 2.27.0
+  firebase_auth: 4.17.8
+  cloud_firestore: 4.15.8
+  firebase_messaging: 14.7.19
+
+  shared_preferences: 2.2.3
+  permission_handler: 12.0.1
+  cupertino_icons: 1.0.8
+  flutter_launcher_icons: 0.14.4
+  flutter_local_notifications: 17.2.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^3.0.2
+  flutter_lints: 3.0.2
 
 flutter:
   uses-material-design: true

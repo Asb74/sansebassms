@@ -10,35 +10,25 @@ project 'Runner', {
 def flutter_root
   env_root = ENV['FLUTTER_ROOT']
   return env_root unless env_root.nil? || env_root.empty?
-
   generated = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
   unless File.exist?(generated)
     raise "#{generated} no existe. Ejecuta 'flutter pub get' primero."
   end
   File.foreach(generated) do |line|
     m = line.match(/FLUTTER_ROOT\=(.*)/)
-    if m
-      return m[1].strip.gsub('\\', '/')
-    end
+    return m[1].strip.gsub('\\', '/') if m
   end
   raise "FLUTTER_ROOT no encontrado en #{generated}."
 end
 
 require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
-
 flutter_ios_podfile_setup
 
 target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
-  # 🔹 Fuerza Firebase iOS SDK >= 12.1.0 para evitar bug en Swift 6
-  pod 'Firebase/Core', '>= 12.1.0'
-  pod 'Firebase/Auth', '>= 12.1.0'
-  pod 'Firebase/Firestore', '>= 12.1.0'
-  pod 'Firebase/Messaging', '>= 12.1.0'
-  pod 'Firebase/SharedSwift', '>= 12.1.0'
-
+  # ❌ No fijamos pods de Firebase aquí. Deja que FlutterFire resuelva 11.x.
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 end
 
@@ -47,6 +37,8 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+      # Mantén Swift 5.9 (Xcode 15). Si lo quitas, igual compila, pero así evitamos sorpresas.
+      config.build_settings['SWIFT_VERSION'] = '5.9'
     end
   end
 end
