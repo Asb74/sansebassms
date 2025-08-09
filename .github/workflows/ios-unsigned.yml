@@ -1,4 +1,4 @@
-name: Build iOS IPA (Unsigned, stable-11x)
+name: Build iOS IPA (Unsigned, with fallback)
 
 on:
   workflow_dispatch:
@@ -12,10 +12,88 @@ concurrency:
 
 jobs:
   build-ios:
-    runs-on: macos-14   # Xcode 15 / Swift 5.9
+    runs-on: macos-14   # Xcode 15 / Swift 5.9 (estable para nuestro stack)
     timeout-minutes: 45
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.7'
+          channel: stable
+
+      - name: Flutter clean & pub get
+        run: |
+          flutter clean
+          flutter pub get
+
+      # Recomendado al menos la 1ª vez tras cambios de Podfile/pubspec
+      - name: Install CocoaPods (update specs)
+        run: |
+          cd ios
+          pod repo update
+          pod install
+          cd ..
+
+      - name: Build IPA (unsigned)
+        run: flutter build ipa --release --no-codesign
+
+      # --- Diagnóstico de salidas ---
+      - name: List iOS build outputs
+        run: |
+          echo "=== tree build/ios ==="
+          ls -la build/ios || true
+          echo "=== tree build/ios/ipa ==="
+          ls -la build/ios/ipa || true
+          echo "=== tree build/ios/archive ==="
+          ls -la build/ios/archive || true
+          echo "=== buscar .xcarchive ==="
+          find build/ios -type d -name "*.xcarchive" -maxdepth 3 || true
+
+      # --- Plan B: crear IPA unsigned desde el .xcarchive si falta ---
+      - name: Fallback - package unsigned IPA manually if missing
+        run: |
+          set -e
+          mkdir -p build/ios/ipa
+          # Si ya existe un .ipa oficial, no hacemos nada
+          if ls build/ios/ipa/*.ipa >/dev/null 2>&1; then
+            echo "IPA oficial encontrado; no es necesario fallback."
+            exit 0
+          fi
+
+          # Buscar el .app dentro de cualquier .xcarchive reciente
+          APP_PATH=$(find build/ios -type d -name "*.xcarchive" -exec sh -c 'echo {}/Products/Applications/*.app' \; | head -n 1)
+
+          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
+            echo "No se encontró .app dentro de ningún .xcarchive. Es probable que la compilación fallara antes."
+            exit 1
+          fi
+
+          echo "Empaquetando IPA unsigned desde: $APP_PATH"
+          rm -rf Payload
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          pushd Payload >/dev/null
+          zip -r -y app-unsigned.zip .
+          popd >/dev/null
+          mv Payload/app-unsigned.zip build/ios/ipa/sansebassms-unsigned.ipa
+          rm -rf Payload
+          echo "Contenido final de build/ios/ipa:"
+          ls -la build/ios/ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-ipa-unsigned
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: error
+          compression-level: 6
+          overwrite: false
+          include-hidden-files: false
+
       - name: Checkout
         uses: actions/checkout@v4
 
@@ -43,6 +121,4 @@ jobs:
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
-        with:
-          name: ios-ipa-unsigned
-          path: build/ios/ipa/*.ipa
+        wi
