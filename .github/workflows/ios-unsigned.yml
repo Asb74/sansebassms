@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*'   # sube a TestFlight cuando etiquetes, p.ej. v1.0.0
+      - 'v*.*.*'   # sube a TestFlight cuando etiquetes p.ej. v1.0.0
 
 jobs:
   ios:
@@ -35,23 +35,28 @@ jobs:
       - name: Decode signing assets
         shell: bash
         run: |
-          echo "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
-          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
-          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > AuthKey.p8
+          printf "%s" "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
+          printf "%s" "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+          printf "%s" "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > AuthKey.p8
+          printf "%s" "${{ secrets.P12_PASSWORD }}" > p12pass.txt
 
-      # Verificación previa: si esto falla, la password o el .p12 no coinciden
-      - name: Verify P12 password (openssl)
+      # Verificación previa: confirma que el .p12 es el correcto y que la password abre
+      - name: Verify P12 (hash + password)
+        shell: bash
         run: |
+          echo "Runner SHA256:"
           shasum -a 256 cert.p12
-          openssl pkcs12 -in cert.p12 -nokeys -passin pass:${{ secrets.P12_PASSWORD }} -info >/dev/null
+          echo "Verificando que la contraseña abre el p12..."
+          openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
       - name: Create dedicated keychain & import cert
+        shell: bash
         run: |
           security create-keychain -p "" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
-          security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -T /usr/bin/codesign
+          security import cert.p12 -k build.keychain -P "$(cat p12pass.txt)" -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
       - name: Install provisioning profile
