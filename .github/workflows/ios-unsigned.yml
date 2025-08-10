@@ -75,31 +75,33 @@ jobs:
 
       - name: Create dedicated keychain & import cert+key (robusto)
         shell: bash
+        env:
+          KEYCHAIN_PASSWORD: actions
         run: |
-          set -e
           source certsha1.env
-          security create-keychain -p "" build.keychain
+
+          # Crear llavero con password NO vacía
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
-          security unlock-keychain -p "" build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
           # 1) Importa el certificado (si ya existe, no romper)
           security import dist-cert.cer -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f x509 || true
 
-          # 2) Intento A: importar la KEY como openssl/PEM
+          # 2) Importa la clave privada (tres intentos: openssl/PEM → PKCS#8 DER → PKCS#12 reconstruido)
           if security import dist-key-only.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f openssl -t priv; then
             echo "Imported private key as openssl/PEM"
-          # 3) Intento B: importar la KEY como PKCS#8 DER
           elif security import dist-key-pkcs8.der -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs8 -t priv; then
             echo "Imported private key as PKCS#8 DER"
-          # 4) Intento C: fallback: importar un PKCS#12 nuevo (key+cert)
           else
             echo "Trying fallback: rebuilt PKCS#12…"
             security import rebuilt.p12 -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs12 -P "rebuildpass"
           fi
 
-          # Conceder acceso y asociar por SHA1
-          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain -Z "$CERT_SHA1"
+          # 3) Conceder acceso sin prompts (usar password del keychain)
+          #    Nota: no filtramos por SHA1; aplicamos a TODAS las private keys del keychain
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" -t private build.keychain
 
           # (Opcional) Ver identidades disponibles
           security find-identity -v -p codesigning build.keychain || true
