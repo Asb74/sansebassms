@@ -19,7 +19,8 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.2.app
           xcodebuild -version
-          xcodebuild -showsdks | grep iPhoneOS
+          echo "iPhoneOS SDK version: $(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK path: $(xcrun --sdk iphoneos --show-sdk-path)"
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
