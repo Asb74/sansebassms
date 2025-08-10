@@ -98,6 +98,7 @@ jobs:
           fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
 
       # Guarda el IPA firmado como artefacto también (útil para verificar)
+      
       - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
