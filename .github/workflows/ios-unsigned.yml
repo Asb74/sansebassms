@@ -48,16 +48,22 @@ jobs:
           echo "Verificando que la contraseña abre el p12..."
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      - name: Create dedicated keychain & import cert
+      - name: Create dedicated keychain & import cert (expect)
         shell: bash
         run: |
+          brew install expect
           security create-keychain -p "" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
-          # Importa usando la contraseña desde archivo para evitar problemas de parsing
-          security import cert.p12 -k build.keychain -T /usr/bin/codesign -P "$(cat p12pass.txt)"
+          expect <<EOF
+          spawn security import cert.p12 -k build.keychain -T /usr/bin/codesign -T /usr/bin/security
+          expect "Enter passphrase for cert.p12:"
+          send "$(cat p12pass.txt)\r"
+          expect eof
+          EOF
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
+
 
       - name: Install provisioning profile
         shell: bash
