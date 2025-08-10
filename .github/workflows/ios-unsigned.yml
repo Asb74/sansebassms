@@ -121,7 +121,7 @@ jobs:
           EOF
 
       # Build SOLO con xcodebuild (sin PROVISIONING_PROFILE_SPECIFIER global)
-      - name: Archive with xcodebuild (manual signing, no profile at archive)
+      - name: Archive with xcodebuild (unsigned archive)
         shell: bash
         run: |
           set -e
@@ -131,11 +131,11 @@ jobs:
             -configuration Release \
             -archivePath ../build/Runner.xcarchive \
             -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_STYLE=Manual \
-            CODE_SIGNING_ALLOWED=YES \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             clean archive
+
 
       - name: Export IPA
         shell: bash
