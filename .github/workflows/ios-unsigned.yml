@@ -1,77 +1,105 @@
-name: Build iOS IPA (Unsigned, stable-11x)
+name: iOS Signed Build & TestFlight
 
 on:
   workflow_dispatch:
   push:
-    branches:
-      - main
-
-concurrency:
-  group: ios-${{ github.ref }}
-  cancel-in-progress: true
+    tags:
+      - 'v*.*.*'   # sube a TestFlight cuando etiquetes una versión, p. ej. v1.0.0
 
 jobs:
-  build-ios:
-    runs-on: macos-14   # Xcode 15 / Swift 5.9
-    timeout-minutes: 45
+  ios:
+    runs-on: macos-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Si usas Flutter:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.7'
           channel: stable
 
-      - name: Flutter clean & pub get
-        run: |
-          flutter clean
-          flutter pub get
+      - name: Flutter pub get
+        run: flutter pub get
 
-      # MUY IMPORTANTE: actualizar repos de CocoaPods para que encuentre CoreOnly 11.15.0, etc.
-      - name: Install CocoaPods (update specs)
+      # (Opcional) cache de pods si ya tienes ios/Pods
+      - name: Install CocoaPods
         run: |
+          sudo gem install cocoapods -N
           cd ios
-          pod repo update
-          pod install
-          cd ..
+          pod install --no-repo-update
 
-      - name: Build IPA (unsigned)
-        run: flutter build ipa --release --no-codesign
-      - name: List iOS build outputs
+      - name: Install fastlane
+        run: gem install fastlane -N
+
+      - name: Decode signing assets
+        shell: bash
         run: |
-          echo "=== tree build/ios ==="
-          ls -la build/ios || true
-          echo "=== tree build/ios/ipa ==="
-          ls -la build/ios/ipa || true
-          echo "=== tree build/ios/archive ==="
-          ls -la build/ios/archive || true
+          echo "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
+          echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+          echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > AuthKey.p8
 
-      - name: Fallback - package unsigned IPA manually if missing
+      - name: Import cert to keychain
         run: |
-          set -e
-          mkdir -p build/ios/ipa
-          # Buscar el .app dentro del .xcarchive generado por Flutter
-          APP_PATH=$(find build/ios -type d -name "*.xcarchive" -exec sh -c 'echo {}/Products/Applications/*.app' \; | head -n 1)
-          if [ -z "$APP_PATH" ] || [ ! -d "$APP_PATH" ]; then
-            echo "No se encontró .app dentro de ningún .xcarchive. Revisa los logs anteriores: probablemente falló la compilación."
-            exit 1
-          fi
-          echo "Empaquetando IPA unsigned desde: $APP_PATH"
-          rm -rf Payload
-          mkdir Payload
-          cp -R "$APP_PATH" Payload/
-          pushd Payload >/dev/null
-          zip -r -y app-unsigned.zip .
-          popd >/dev/null
-          mv Payload/app-unsigned.zip build/ios/ipa/sansebassms-unsigned.ipa
-          rm -rf Payload
-          ls -la build/ios/ipa
+          security create-keychain -p "" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "" build.keychain
+          security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
-      - name: Upload IPA
+      - name: Install provisioning profile
+        shell: bash
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
+          cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+
+      - name: Create ExportOptions.plist
+        run: |
+          cat > ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>uploadSymbols</key><true/>
+            <key>stripSwiftSymbols</key><true/>
+            <key>compileBitcode</key><false/>
+            <key>destination</key><string>export</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${{ secrets.APP_IDENTIFIER }}</key>
+              <string>Sansebassms AppStore Profile</string> <!-- cambia por el Name real del perfil si es distinto -->
+            </dict>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed IPA for App Store
+        run: flutter build ipa --release --export-options-plist=ExportOptions.plist
+
+      - name: Upload to TestFlight (fastlane pilot)
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        run: |
+          cat > api_key.json <<EOF
+          {
+            "key_id": "${{ secrets.APP_STORE_CONNECT_KEY_ID }}",
+            "issuer_id": "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}",
+            "key": "$(cat AuthKey.p8)",
+            "in_house": false
+          }
+          EOF
+          IPA_PATH=$(ls build/ios/ipa/*.ipa | head -n 1)
+          fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
+
+      # Guarda el IPA firmado como artefacto también (útil para verificar)
+      - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ios-ipa-unsigned
+          name: ios-signed-ipa
           path: build/ios/ipa/*.ipa
