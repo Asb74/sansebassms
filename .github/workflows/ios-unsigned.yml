@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*'   # sube a TestFlight cuando etiquetes una versión, p. ej. v1.0.0
+      - 'v*.*.*'   # sube a TestFlight cuando etiquetes, p.ej. v1.0.0
 
 jobs:
   ios:
     runs-on: macos-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Si usas Flutter:
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -23,7 +23,6 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      # (Opcional) cache de pods si ya tienes ios/Pods
       - name: Install CocoaPods
         run: |
           sudo gem install cocoapods -N
@@ -40,9 +39,16 @@ jobs:
           echo "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
           echo "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > AuthKey.p8
 
-      - name: Import cert to keychain
+      # Verificación previa: si esto falla, la password o el .p12 no coinciden
+      - name: Verify P12 password (openssl)
+        run: |
+          shasum -a 256 cert.p12
+          openssl pkcs12 -in cert.p12 -nokeys -passin pass:${{ secrets.P12_PASSWORD }} -info >/dev/null
+
+      - name: Create dedicated keychain & import cert
         run: |
           security create-keychain -p "" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
           security import cert.p12 -k build.keychain -P "${{ secrets.P12_PASSWORD }}" -T /usr/bin/codesign
@@ -72,7 +78,7 @@ jobs:
             <key>provisioningProfiles</key>
             <dict>
               <key>${{ secrets.APP_IDENTIFIER }}</key>
-              <string>Sansebassms AppStore Profile</string> <!-- cambia por el Name real del perfil si es distinto -->
+              <string>Sansebassms AppStore Profile</string>
             </dict>
           </dict>
           </plist>
@@ -97,8 +103,6 @@ jobs:
           IPA_PATH=$(ls build/ios/ipa/*.ipa | head -n 1)
           fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
 
-      # Guarda el IPA firmado como artefacto también (útil para verificar)
-      
       - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
