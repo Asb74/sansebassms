@@ -50,7 +50,7 @@ web/manifest.json
 !ios/Flutter/Flutter.framework
 !ios/Flutter/App.framework
 !ios/Flutter/Flutter.podspec
-!ios/Flutter/Generated.xcconfig
+#!ios/Flutter/Generated.xcconfig
 !ios/Runner/GeneratedPluginRegistrant.*
 !ios/Flutter/podhelper.rb
 + !ios/Runner.xcodeproj/
