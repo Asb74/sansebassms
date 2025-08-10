@@ -40,7 +40,6 @@ jobs:
           printf "%s" "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > AuthKey.p8
           printf "%s" "${{ secrets.P12_PASSWORD }}" > p12pass.txt
 
-      # Verificación previa: confirma que el .p12 es el correcto y que la password abre
       - name: Verify P12 (hash + password)
         shell: bash
         run: |
@@ -56,7 +55,8 @@ jobs:
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "" build.keychain
-          security import cert.p12 -k build.keychain -P "$(cat p12pass.txt)" -T /usr/bin/codesign
+          # Importa usando la contraseña desde archivo para evitar problemas de parsing
+          security import cert.p12 -k build.keychain -T /usr/bin/codesign -P "$(cat p12pass.txt)"
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain
 
       - name: Install provisioning profile
