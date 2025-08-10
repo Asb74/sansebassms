@@ -47,7 +47,7 @@ jobs:
           echo "Runner SHA256:"; shasum -a 256 cert.p12
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      - name: Create keychain & import p12
+      - name: Create keychain & import identities (robusto)
         shell: bash
         env:
           KEYCHAIN_PASSWORD: actions
@@ -57,13 +57,32 @@ jobs:
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          # Import del p12 (cert + private key)
-          security import cert.p12 -k build.keychain -P "$(cat p12pass.txt)" -T /usr/bin/codesign -T /usr/bin/security
-          # Dar acceso a herramientas de Apple
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-          # Usar SOLO este llavero para la build
           security list-keychains -d user -s build.keychain
+
+          echo "Intento 1: importar P12 directamente…"
+          if security import cert.p12 -k build.keychain -P "$(tr -d '\n' < p12pass.txt)" -T /usr/bin/codesign -T /usr/bin/security; then
+            echo "OK: import directo"
+          else
+            echo "FALLBACK: extraer cert y key con openssl e importar por separado"
+            # Cert y key desde el p12
+            openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
+            openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key-raw.pem
+            awk '/-----BEGIN .*PRIVATE KEY-----/,/-----END .*PRIVATE KEY-----/' dist-key-raw.pem > dist-key-only.pem
+
+            # Importar cert (X.509) y key (PEM)
+            security import dist-cert.cer     -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f x509
+            if ! security import dist-key-only.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f openssl -t priv; then
+              echo "Segundo fallback: reconstruir P12 limpio y reimportar"
+              openssl pkcs12 -export -inkey dist-key-only.pem -in dist-cert.cer -name "iOS Distribution" -out rebuilt.p12 -passout pass:rebuildpass
+              security import rebuilt.p12 -k build.keychain -P "rebuildpass" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
+            fi
+          fi
+
+          # Permisos para codesign y limitar búsqueda al llavero de build
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" -t private build.keychain
+          echo "Identidades disponibles:"
           security find-identity -v -p codesigning build.keychain || true
+
 
       - name: Install provisioning profile
         shell: bash
@@ -90,76 +109,77 @@ jobs:
                       grep -q 'Generated.xcconfig' "$cfg" || echo '#include? "Generated.xcconfig"' >> "$cfg"
                     done
                     echo "Usando $(grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig)"
+      # === Build: archivo SIN firmar ===
+      - name: Archive with xcodebuild (unsigned)
+        shell: bash
+        run: |
+          set -e
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath ../build/Runner.xcarchive \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
+            clean archive
 
-                # === Build: archivo SIN firmar ===
-                - name: Archive with xcodebuild (unsigned)
-                  shell: bash
-                  run: |
-                    set -e
-                    cd ios
-                    xcodebuild -workspace Runner.xcworkspace \
-                      -scheme Runner \
-                      -configuration Release \
-                      -archivePath ../build/Runner.xcarchive \
-                      -destination 'generic/platform=iOS' \
-                      CODE_SIGNING_ALLOWED=NO \
-                      CODE_SIGN_STYLE=Manual \
-                      DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
-                      clean archive
+      # === Export: firma para App Store ===
+      - name: Create ExportOptions.plist
+        shell: bash
+        run: |
+          cat > ExportOptions.plist <<'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>${{ secrets.APP_IDENTIFIER }}</key>
+              <string>Sansebassms AppStore Profile</string>
+            </dict>
+            <key>uploadSymbols</key><true/>
+            <key>stripSwiftSymbols</key><true/>
+            <key>compileBitcode</key><false/>
+            <key>destination</key><string>export</string>
+          </dict>
+          </plist>
+          EOF
 
-                # === Export: firma para App Store ===
-                - name: Create ExportOptions.plist
-                  shell: bash
-                  run: |
-                    cat > ExportOptions.plist <<'EOF'
-                    <?xml version="1.0" encoding="UTF-8"?>
-                    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-                    <plist version="1.0">
-                    <dict>
-                      <key>method</key><string>app-store</string>
-                      <key>signingStyle</key><string>manual</string>
-                      <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
-                      <key>provisioningProfiles</key>
-                      <dict>
-                        <key>${{ secrets.APP_IDENTIFIER }}</key>
-                        <string>Sansebassms AppStore Profile</string>
-                      </dict>
-                      <key>uploadSymbols</key><true/>
-                      <key>stripSwiftSymbols</key><true/>
-                      <key>compileBitcode</key><false/>
-                      <key>destination</key><string>export</string>
-                    </dict>
-                    </plist>
-                    EOF
+      - name: Export IPA
+        shell: bash
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath build/Runner.xcarchive \
+            -exportOptionsPlist ExportOptions.plist \
+            -exportPath build/ios_export
 
-                - name: Export IPA
-                  shell: bash
-                  run: |
-                    xcodebuild -exportArchive \
-                      -archivePath build/Runner.xcarchive \
-                      -exportOptionsPlist ExportOptions.plist \
-                      -exportPath build/ios_export
+      # === Subida a TestFlight ===
+      - name: Upload to TestFlight (fastlane pilot)
+        env:
+          APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        shell: bash
+        run: |
+          cat > api_key.json <<EOF
+          {
+            "key_id": "${{ secrets.APP_STORE_CONNECT_KEY_ID }}",
+            "issuer_id": "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}",
+            "key": "$(cat AuthKey.p8)",
+            "in_house": false
+          }
+          EOF
+          IPA_PATH=$(ls build/ios_export/*.ipa | head -n 1)
+          fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
 
-                # === Subida a TestFlight ===
-                - name: Upload to TestFlight (fastlane pilot)
-                  env:
-                    APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
-                    APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
-                  shell: bash
-                  run: |
-                    cat > api_key.json <<EOF
-                    {
-                      "key_id": "${{ secrets.APP_STORE_CONNECT_KEY_ID }}",
-                      "issuer_id": "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}",
-                      "key": "$(cat AuthKey.p8)",
-                      "in_house": false
-                    }
-                    EOF
-                    IPA_PATH=$(ls build/ios_export/*.ipa | head -n 1)
-                    fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
+      - name: Upload signed IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-signed-ipa
+          path: build/ios_export/*.ipa
 
-                - name: Upload signed IPA artifact
-                  uses: actions/upload-artifact@v4
-                  with:
-                    name: ios-signed-ipa
-                    path: build/ios_export/*.ipa
+                
