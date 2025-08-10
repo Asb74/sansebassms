@@ -49,17 +49,19 @@ jobs:
           echo "Verificando que la contraseña abre el p12..."
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      # EXTRAER cert y key con OpenSSL para evitar import directo del .p12
+      # EXTRAER cert y key con OpenSSL (clave en PKCS#8 DER)
       - name: Extract cert & key with OpenSSL
         shell: bash
         run: |
-          # Extrae el certificado (sin keys)
+          # 1) Certificado público (X.509)
           openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
-          # Extrae la clave privada en PEM con pass temporal
+          # 2) Clave privada en PEM con pass temporal
           openssl pkcs12 -in cert.p12 -nocerts -passin file:p12pass.txt -passout pass:tmpkeypass -out dist-key.pem
-          # Convierte la clave a PKCS#8 SIN contraseña (formato que entiende bien security)
-          openssl pkcs8 -topk8 -inform PEM -outform PEM -in dist-key.pem -passin pass:tmpkeypass -nocrypt -out dist-key-pkcs8.pem
-          # Calcula SHA1 del cert para set-key-partition-list
+          # 3) Convertir la clave a PKCS#8 DER sin contraseña (formato que 'security' entiende bien)
+          openssl pkcs8 -topk8 -inform PEM -outform DER -in dist-key.pem -passin pass:tmpkeypass -nocrypt -out dist-key-pkcs8.der
+          # (fallback) Extraer bundle PEM completo por si hiciera falta importar pemseq
+          openssl pkcs12 -in cert.p12 -nodes -passin file:p12pass.txt -out full.pem
+          # SHA1 del cert para set-key-partition-list
           CERT_SHA1=$(openssl x509 -in dist-cert.cer -noout -fingerprint -sha1 | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
           echo "CERT_SHA1=$CERT_SHA1" > certsha1.env
           cat certsha1.env
@@ -76,15 +78,14 @@ jobs:
           # Importa el certificado (X.509)
           security import dist-cert.cer -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f x509
 
-          # Importa la clave privada PKCS#8 SIN pass
-          # (primero probamos como pkcs8, si falla probamos pemseq)
-          security import dist-key-pkcs8.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs8 -t priv \
-          || security import dist-key-pkcs8.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pemseq -t priv
+          # Importa la clave privada PKCS#8 DER (tipo private)
+          security import dist-key-pkcs8.der -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs8 -t priv \
+            || security import full.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pemseq
 
-          # Da acceso a apple-tool/apple y asocia por SHA1
+          # Concede acceso y asocia por SHA1
           security set-key-partition-list -S apple-tool:,apple: -s -k "" build.keychain -Z "$CERT_SHA1"
 
-          # (Opcional) Verifica que hay identidad de codesign disponible
+          # (Opcional) Ver identidades disponibles
           security find-identity -v -p codesigning build.keychain || true
 
       - name: Install provisioning profile
