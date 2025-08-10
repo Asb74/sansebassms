@@ -119,18 +119,28 @@ jobs:
           </dict>
           </plist>
           EOF
-      - name: Fix Flutter iOS configs (FLUTTER_ROOT)
+      - name: Fix FLUTTER_ROOT for iOS build
         shell: bash
         run: |
-          # Quita el generado si está commiteado y fuerza que Xcode lo regenere
-          rm -f ios/Flutter/Generated.xcconfig || true
-          # Sustituye cualquier FLUTTER_ROOT hardcodeado por el del runner
-          for f in ios/Flutter/*.xcconfig; do
-            [ -f "$f" ] || continue
-            /usr/bin/sed -i '' -E "s#^FLUTTER_ROOT=.*#FLUTTER_ROOT=${FLUTTER_ROOT}#g" "$f" || true
-          done
-          echo "Comprobación:"
-          grep -R "^FLUTTER_ROOT" -n ios/Flutter || true
+          mkdir -p ios/Flutter
+          # Si existe Generated.xcconfig (con ruta de Windows), reescribe solo FLUTTER_ROOT
+          if [ -f ios/Flutter/Generated.xcconfig ]; then
+            /usr/bin/sed -i '' -E "s#^FLUTTER_ROOT=.*#FLUTTER_ROOT=${FLUTTER_ROOT}#g" ios/Flutter/Generated.xcconfig || true
+          else
+            # Si no existe, crea uno mínimo con el FLUTTER_ROOT correcto del runner
+            cat > ios/Flutter/Generated.xcconfig <<EOF
+          FLUTTER_ROOT=${FLUTTER_ROOT}
+          EOF
+              fi
+
+              # Asegura que Debug/Release incluyen Generated.xcconfig
+              for cfg in ios/Flutter/Debug.xcconfig ios/Flutter/Release.xcconfig; do
+                [ -f "$cfg" ] || touch "$cfg"
+                grep -q 'Generated.xcconfig' "$cfg" || echo '#include? "Generated.xcconfig"' >> "$cfg"
+              done
+
+              echo "Usando $(grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig)"
+
 
       # Build SOLO con xcodebuild (sin PROVISIONING_PROFILE_SPECIFIER global)
       - name: Archive with xcodebuild (unsigned archive)
