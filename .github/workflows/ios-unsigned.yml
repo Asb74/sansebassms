@@ -15,13 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16 (iOS 18 SDK)
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app
-          xcodebuild -version
-          echo "iPhoneOS SDK version: $(xcrun --sdk iphoneos --show-sdk-version)"
-          echo "iPhoneOS SDK path: $(xcrun --sdk iphoneos --show-sdk-path)"
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -41,6 +34,13 @@ jobs:
           gem install fastlane -N
           brew install jq
 
+      # Usar Xcode 16 (SDK iOS 18)
+      - name: Select Xcode 16 (iOS 18 SDK)
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.2.app
+          xcodebuild -version
+          echo "iPhoneOS SDK version: $(xcrun --sdk iphoneos --show-sdk-version)"
+
       - name: Decode signing assets
         shell: bash
         run: |
@@ -58,11 +58,15 @@ jobs:
       - name: Extract cert & key with OpenSSL
         shell: bash
         run: |
+          # Cert en PEM
           openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
+          # Clave privada (PEM sin pass)
           openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key-raw.pem
           awk '/-----BEGIN .*PRIVATE KEY-----/,/-----END .*PRIVATE KEY-----/' dist-key-raw.pem > dist-key-only.pem
-          # Fallback: rehacer un PKCS#12 limpio por si import PEM falla
+          # PKCS#12 de respaldo para import
           openssl pkcs12 -export -inkey dist-key-only.pem -in dist-cert.cer -name "iOS Dist Identity" -out rebuilt.p12 -passout pass:rebuildpass
+          # SHA1 (info)
+          openssl x509 -in dist-cert.cer -noout -fingerprint -sha1
 
       - name: Create dedicated keychain & import identities (robusto)
         shell: bash
@@ -70,28 +74,31 @@ jobs:
           KEYCHAIN_PASSWORD: actions
         run: |
           set -e
-          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-          security set-keychain-settings -lut 21600 build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          KEYCHAIN_PATH="$HOME/Library/Keychains/build.keychain-db"
 
-          # Importa certificado y clave (primero PEM; si falla, el PKCS#12 reconstruido)
-          security import dist-cert.cer -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f x509 || true
-          if security import dist-key-only.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f openssl -t priv; then
-            echo "Private key imported (PEM)"
+          # Crear y desbloquear keychain dedicado
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH"
+          security default-keychain -s "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+          # Importar cert + key
+          security import dist-cert.cer   -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f x509 || true
+          # Intento 1: clave en PEM
+          if security import dist-key-only.pem -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f openssl -t priv; then
+            echo "Imported private key (PEM)"
           else
-            echo "Fallback: import rebuilt PKCS#12"
-            security import rebuilt.p12 -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs12 -P "rebuildpass"
+            # Intento 2: PKCS#12 reconstruido
+            security import rebuilt.p12 -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f pkcs12 -P "rebuildpass"
           fi
 
-          # Asegurar que el llavero está en la search list
-          security list-keychains -d user -s build.keychain
-
-          # Permisos para codesign en ese llavero
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" -t private build.keychain
+          # MUY IMPORTANTE: establecer partition list sobre ESTE keychain concreto
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
           echo "Identidades disponibles:"
-          security find-identity -v -p codesigning build.keychain || true
+          security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
 
       - name: Install provisioning profile
         shell: bash
@@ -140,6 +147,7 @@ jobs:
           done
           echo "Usando $(grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig)"
 
+      # Archive sin firmar y firmamos al export
       - name: Archive with xcodebuild (unsigned)
         shell: bash
         run: |
@@ -155,7 +163,7 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             clean archive
 
-      - name: Export IPA (signed)
+      - name: Export IPA (sign here)
         shell: bash
         run: |
           xcodebuild -exportArchive \
@@ -168,6 +176,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # Escapar la clave .p8 a JSON correctamente
           KEY=$(jq -Rs . < AuthKey.p8)
           cat > api_key.json <<EOF
           {
