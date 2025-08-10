@@ -4,16 +4,27 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*.*.*'  # lanza al crear un tag tipo v1.2.3
 
 jobs:
   ios:
     runs-on: macos-latest
     timeout-minutes: 60
+    env:
+      # Fuerza Xcode 16.2 (SDK iOS 18)
+      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16.2 + verify SDK
+        shell: bash
+        run: |
+          sudo xcode-select -s "$DEVELOPER_DIR"
+          xcodebuild -version
+          # Muestra SDKs (no falles si grep no encuentra nada)
+          xcodebuild -showsdks | tee /dev/stderr | grep -E "iPhoneOS|iOS" || true
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -32,73 +43,49 @@ jobs:
       - name: Install fastlane & jq
         run: |
           gem install fastlane -N
-          brew install jq
+          brew install jq || true
 
-      # Usar Xcode 16 (SDK iOS 18)
-      - name: Select Xcode 16 (iOS 18 SDK)
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app
-          xcodebuild -version
-          echo "iPhoneOS SDK version: $(xcrun --sdk iphoneos --show-sdk-version)"
-
+      # === Firmado ===
       - name: Decode signing assets
         shell: bash
         run: |
+          # P12 y profile vienen en base64 -> decodifica
           printf "%s" "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
           printf "%s" "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+          # La API key: si TU secreto ya está en raw (.p8), NO decodifiques:
           printf "%s" "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" > AuthKey.p8
+          # Password del P12 a archivo para evitar problemas de quoting
           printf "%s" "${{ secrets.P12_PASSWORD }}" > p12pass.txt
 
       - name: Verify P12 (hash + password)
         shell: bash
         run: |
           echo "Runner SHA256:"; shasum -a 256 cert.p12
+          # Comprueba que abre con la pass
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      - name: Extract cert & key with OpenSSL
-        shell: bash
-        run: |
-          # Cert en PEM
-          openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
-          # Clave privada (PEM sin pass)
-          openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key-raw.pem
-          awk '/-----BEGIN .*PRIVATE KEY-----/,/-----END .*PRIVATE KEY-----/' dist-key-raw.pem > dist-key-only.pem
-          # PKCS#12 de respaldo para import
-          openssl pkcs12 -export -inkey dist-key-only.pem -in dist-cert.cer -name "iOS Dist Identity" -out rebuilt.p12 -passout pass:rebuildpass
-          # SHA1 (info)
-          openssl x509 -in dist-cert.cer -noout -fingerprint -sha1
-
-      - name: Create dedicated keychain & import identities (robusto)
+      - name: Create keychain & import identity
         shell: bash
         env:
           KEYCHAIN_PASSWORD: actions
         run: |
           set -e
-          KEYCHAIN_PATH="$HOME/Library/Keychains/build.keychain-db"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security set-keychain-settings -lut 21600 build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-          # Crear y desbloquear keychain dedicado
-          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
-          security list-keychains -d user -s "$KEYCHAIN_PATH"
-          security default-keychain -s "$KEYCHAIN_PATH"
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # Importa la identidad del P12 (cert+private key)
+          security import cert.p12 -k build.keychain -P "$(cat p12pass.txt)" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
 
-          # Importar cert + key
-          security import dist-cert.cer   -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f x509 || true
-          # Intento 1: clave en PEM
-          if security import dist-key-only.pem -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f openssl -t priv; then
-            echo "Imported private key (PEM)"
-          else
-            # Intento 2: PKCS#12 reconstruido
-            security import rebuilt.p12 -k "$KEYCHAIN_PATH" -A -T /usr/bin/codesign -T /usr/bin/security -T /usr/bin/xcodebuild -f pkcs12 -P "rebuildpass"
-          fi
+          # Pon este keychain como ÚNICO en la search list (evita que Xcode mire otros)
+          security list-keychains -d user -s build.keychain
 
-          # MUY IMPORTANTE: establecer partition list sobre ESTE keychain concreto
-          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          # Permisos para codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
 
-          echo "Identidades disponibles:"
-          security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
+          echo "Identidades de codesigning en el keychain:"
+          security find-identity -v -p codesigning build.keychain || true
 
       - name: Install provisioning profile
         shell: bash
@@ -108,6 +95,7 @@ jobs:
           cp profile.mobileprovision ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
 
       - name: Create ExportOptions.plist
+        shell: bash
         run: |
           cat > ExportOptions.plist <<'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
@@ -116,11 +104,11 @@ jobs:
           <dict>
             <key>method</key><string>app-store</string>
             <key>signingStyle</key><string>manual</string>
-            <key>uploadSymbols</key><true/>
-            <key>stripSwiftSymbols</key><true/>
-            <key>compileBitcode</key><false/>
-            <key>destination</key><string>export</string>
             <key>teamID</key><string>${{ secrets.APPLE_TEAM_ID }}</string>
+            <key>destination</key><string>export</string>
+            <key>stripSwiftSymbols</key><true/>
+            <key>uploadSymbols</key><true/>
+            <key>compileBitcode</key><false/>
             <key>provisioningProfiles</key>
             <dict>
               <key>${{ secrets.APP_IDENTIFIER }}</key>
@@ -130,6 +118,7 @@ jobs:
           </plist>
           EOF
 
+      # === Build sin firmar + export firmando ===
       - name: Fix FLUTTER_ROOT for iOS build
         shell: bash
         run: |
@@ -147,7 +136,6 @@ jobs:
           done
           echo "Usando $(grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig)"
 
-      # Archive sin firmar y firmamos al export
       - name: Archive with xcodebuild (unsigned)
         shell: bash
         run: |
@@ -163,34 +151,35 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             clean archive
 
-      - name: Export IPA (sign here)
+      - name: Export signed IPA
         shell: bash
         run: |
           xcodebuild -exportArchive \
             -archivePath build/Runner.xcarchive \
             -exportOptionsPlist ExportOptions.plist \
-            -exportPath build/ios_export
+            -exportPath build/ios/export
 
+      # === Subida a TestFlight ===
       - name: Upload to TestFlight (fastlane pilot)
         env:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
+        shell: bash
         run: |
-          # Escapar la clave .p8 a JSON correctamente
+          # Convierte la clave .p8 (con newlines) en string JSON seguro
           KEY=$(jq -Rs . < AuthKey.p8)
           cat > api_key.json <<EOF
-          {
-            "key_id": "${{ secrets.APP_STORE_CONNECT_KEY_ID }}",
-            "issuer_id": "${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}",
-            "key": $KEY,
-            "in_house": false
-          }
+          {"key_id":"${{ secrets.APP_STORE_CONNECT_KEY_ID }}",
+           "issuer_id":"${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}",
+           "key": $KEY,
+           "in_house": false}
           EOF
-          IPA_PATH=$(ls build/ios_export/*.ipa | head -n 1)
+          IPA_PATH=$(ls build/ios/export/*.ipa | head -n 1)
+          echo "Subiendo $IPA_PATH a TestFlight…"
           fastlane pilot upload --api_key_path api_key.json --ipa "$IPA_PATH" --skip_waiting_for_build_processing true
 
       - name: Upload signed IPA artifact
         uses: actions/upload-artifact@v4
         with:
           name: ios-signed-ipa
-          path: build/ios_export/*.ipa
+          path: build/ios/export/*.ipa
