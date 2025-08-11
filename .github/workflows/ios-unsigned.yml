@@ -43,7 +43,9 @@ jobs:
         run: |
           sudo gem install cocoapods -N
           cd ios
-          pod install --no-repo-update
+          # Update the CocoaPods repo to ensure podspec patches like the
+          # removal of deprecated `GCC_WARN_INHIBIT_ALL_WARNINGS` are pulled in.
+          pod install --repo-update
 
       - name: Install fastlane & jq
         run: |
