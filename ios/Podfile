@@ -38,7 +38,7 @@ post_install do |installer|
     flutter_additional_ios_build_settings(target)
 
     target.build_configurations.each do |config|
-      # Tus ajustes base
+      # Mantén el mínimo que ya estabas usando
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       config.build_settings['SWIFT_VERSION'] = '5.9'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
@@ -50,16 +50,8 @@ post_install do |installer|
       config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
       config.build_settings['PROVISIONING_PROFILE'] = ''
       config.build_settings['DEVELOPMENT_TEAM'] = ''
-
-      # 🔧 Quitar flags "-G" (y "-G <n>") que rompen con clang de iOS
-      keys = config.build_settings.keys.grep(/OTHER_(C|CPLUSPLUS|LD)FLAGS(\[.*\])?/)
-      keys.each do |k|
-        v = config.build_settings[k]
-        next unless v
-        s = Array(v).flatten.map(&:to_s).join(' ')
-        s = s.gsub(/(^|\s)-G(\s*\d+)?(?=\s|$)/, ' ')
-        config.build_settings[k] = s.strip.split(/\s+/)
-      end
     end
   end
 end
+
+

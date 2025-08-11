@@ -4,25 +4,16 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v*.*.*'   # p.ej. v1.0.0
+      - 'v*.*.*'
 
 jobs:
   ios:
     runs-on: macos-latest
     timeout-minutes: 60
-    env:
-      DEVELOPER_DIR: /Applications/Xcode_16.2.app/Contents/Developer
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      # Asegura Xcode 16.2 (SDK iOS 18.x)
-      - name: Select Xcode 16.2
-        run: |
-          sudo xcode-select -s /Applications/Xcode_16.2.app
-          xcodebuild -version
-          xcodebuild -showsdks | grep iPhoneOS || true
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -36,48 +27,9 @@ jobs:
         run: |
           sudo gem install cocoapods -N
           cd ios
-          pod repo update
-          pod install --repo-update
+          pod install --no-repo-update
 
-      # Bump de mínimos (Runner + AppFramework) a 15.0
-      - name: Bump iOS minimums (Runner + AppFramework)
-        shell: bash
-        run: |
-          /usr/bin/sed -i '' -E 's/(IPHONEOS_DEPLOYMENT_TARGET = )([0-9]+\.[0-9]+);/\115.0;/g' ios/Runner.xcodeproj/project.pbxproj
-          /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 15.0" ios/Flutter/AppFrameworkInfo.plist || true
-
-      # Limpia cualquier token que empiece por -G en Pods y pbxproj
-      - name: Strip illegal -G (only bare or numeric) from configs
-        shell: bash
-        run: |
-          set -e
-          # .xcconfig de Pods: quita -G o -G[espacios]número
-          find ios/Pods -name "*.xcconfig" -print0 | \
-            xargs -0 /usr/bin/sed -i '' -E 's/(^|[[:space:]])-G([[:space:]]*[0-9]+)?([[:space:]]|$)/ /g'
-
-          # project.pbxproj (Runner): en OTHER_*FLAGS
-          /usr/bin/sed -i '' -E 's/(OTHER_(CFLAGS|CPLUSPLUSFLAGS) = [^;"]*)-G([[:space:]]*[0-9]+)?([^;"]*;)/\1\4/g' ios/Runner.xcodeproj/project.pbxproj || true
-
-          # project.pbxproj (Pods/Runner): dentro de COMPILER_FLAGS="..."
-          /usr/bin/sed -i '' -E 's/(COMPILER_FLAGS = "[^"]*)-G([[:space:]]*[0-9]+)?([^"]*")/\1\3/g' ios/Pods/Pods.xcodeproj/project.pbxproj || true
-          /usr/bin/sed -i '' -E 's/(COMPILER_FLAGS = "[^"]*)-G([[:space:]]*[0-9]+)?([^"]*")/\1\3/g' ios/Runner.xcodeproj/project.pbxproj || true
-
-
-      - name: Sanity check CFLAGS (no bare -G / -G<number>)
-        shell: bash
-        run: |
-          # Coincide con: "-G" solo, o "-G" seguido opcionalmente de espacios y dígitos.
-          if grep -R --include=\*.{xcconfig,pbxproj} -nE '(^|[[:space:]])-G([[:space:]]|$|[[:space:]]*[0-9]+([[:space:]]|$))' ios; then
-            echo "Aún aparece -G (puro o numérico) en alguna config"; exit 1
-          else
-            echo "OK: no se ve -G problemático en configs";
-          fi
-
-      # Limpieza de DerivedData para un build fresco
-      - name: Clean DerivedData (fresh build)
-        run: rm -rf ~/Library/Developer/Xcode/DerivedData
-
-      - name: Install fastlane + jq
+      - name: Install fastlane & jq
         run: |
           gem install fastlane -N
           brew install jq
@@ -85,9 +37,12 @@ jobs:
       - name: Decode signing assets
         shell: bash
         run: |
+          # P12 y perfil
           printf "%s" "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
-          printf "%s" "${{ secrets.P12_PASSWORD }}" > p12pass.txt
           printf "%s" "${{ secrets.PROVISIONING_PROFILE_BASE64 }}" | base64 --decode > profile.mobileprovision
+          printf "%s" "${{ secrets.P12_PASSWORD }}" > p12pass.txt
+
+          # API key: ¡ahora sí la decodificamos a .p8 real!
           printf "%s" "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > AuthKey.p8
 
       - name: Verify P12 (hash + password)
@@ -96,40 +51,39 @@ jobs:
           echo "Runner SHA256:"; shasum -a 256 cert.p12
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      # Reempaquetar el P12 y meterlo en keychain dedicado (import robusto)
-      - name: Create keychain & import identity (repack PKCS#12)
+      - name: Extract cert & key with OpenSSL
+        shell: bash
+        run: |
+          openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
+          openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key-raw.pem
+          awk '/-----BEGIN .*PRIVATE KEY-----/,/-----END .*PRIVATE KEY-----/' dist-key-raw.pem > dist-key-only.pem
+          openssl pkcs12 -export -inkey dist-key-only.pem -in dist-cert.cer -name "iOS Dist Identity" -out rebuilt.p12 -passout pass:rebuildpass
+          CERT_SHA1=$(openssl x509 -in dist-cert.cer -noout -fingerprint -sha1 | sed 's/.*=//;s/://g' | tr '[:upper:]' '[:lower:]')
+          echo "CERT_SHA1=$CERT_SHA1" > certsha1.env
+          cat certsha1.env
+
+      - name: Create dedicated keychain & import identities (robusto)
         shell: bash
         env:
           KEYCHAIN_PASSWORD: actions
         run: |
           set -e
+          source certsha1.env
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security set-keychain-settings -lut 21600 build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
 
-          # 1) Extrae cert y key del P12 original
-          openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
-          openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key.pem
-          awk '/-----BEGIN .*PRIVATE KEY-----/,/-----END .*PRIVATE KEY-----/' dist-key.pem > dist-key-only.pem
+          security import dist-cert.cer -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f x509 || true
+          if security import dist-key-only.pem -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f openssl -t priv; then
+            echo "Imported private key (PEM)"
+          else
+            echo "Fallback: import rebuilt PKCS#12"
+            security import rebuilt.p12 -k build.keychain -A -T /usr/bin/codesign -T /usr/bin/security -f pkcs12 -P "rebuildpass"
+          fi
 
-          # 2) Reempaqueta a PKCS#12 con pass temporal
-          LOCAL_P12_PASS=$(openssl rand -hex 12)
-          openssl pkcs12 -export \
-            -inkey dist-key-only.pem \
-            -in dist-cert.cer \
-            -name "iOS Distribution (repacked)" \
-            -out identity.p12 \
-            -passout pass:${LOCAL_P12_PASS}
-
-          # 3) Importa ese PKCS#12
-          security import identity.p12 -k build.keychain -P "${LOCAL_P12_PASS}" -T /usr/bin/codesign -T /usr/bin/security -f pkcs12
-
-          # 4) Usa sólo este keychain y da permisos de codesign
           security list-keychains -d user -s build.keychain
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-
-          echo "Identidades de codesigning en el keychain:"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" -t private build.keychain
           security find-identity -v -p codesigning build.keychain || true
 
       - name: Install provisioning profile
@@ -162,7 +116,6 @@ jobs:
           </plist>
           EOF
 
-      # FLUTTER_ROOT correcto en el runner (evita ruta de Windows)
       - name: Fix FLUTTER_ROOT for iOS build
         shell: bash
         run: |
@@ -178,9 +131,8 @@ jobs:
             [ -f "$cfg" ] || touch "$cfg"
             grep -q 'Generated.xcconfig' "$cfg" || echo '#include? "Generated.xcconfig"' >> "$cfg"
           done
-          echo "Usando $(grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig)"
+          grep ^FLUTTER_ROOT ios/Flutter/Generated.xcconfig
 
-      # Archive sin firmar (evita perfiles en pods)
       - name: Archive with xcodebuild (unsigned)
         shell: bash
         run: |
@@ -196,7 +148,7 @@ jobs:
             DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} \
             clean archive
 
-      - name: Export IPA (sign)
+      - name: Export IPA
         shell: bash
         run: |
           xcodebuild -exportArchive \
@@ -209,6 +161,7 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: |
+          # Clave en JSON con saltos de línea escapados correctamente
           KEY=$(jq -Rs . < AuthKey.p8)
           cat > api_key.json <<EOF
           {
