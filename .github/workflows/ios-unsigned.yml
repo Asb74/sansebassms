@@ -36,7 +36,26 @@ jobs:
         run: |
           sudo gem install cocoapods -N
           cd ios
-          pod install --no-repo-update
+          pod repo update
+          pod install --repo-update
+
+      - name: Strip illegal -G from Pod xcconfigs
+        shell: bash
+        run: |
+          set -e
+          # Edita en sitio todos los .xcconfig de Pods
+          find ios/Pods -name "*.xcconfig" -print0 | xargs -0 sed -i '' -E 's/(^|[[:space:]])-G([[:space:]]|$)/ /g' || true
+          # Por si hubiera algo en el pbxproj del Runner
+          sed -i '' -E 's/(OTHER_CFLAGS = [^;"]*)-G([^;"]*;)/\1\2/g' ios/Runner.xcodeproj/project.pbxproj || true
+
+      - name: Sanity check CFLAGS (no -G)
+        shell: bash
+        run: |
+          if grep -R --include=\*.{xcconfig,pbxproj} -nE '(^| )-G( |$)' ios; then
+            echo "Aún aparece -G en alguna config"; exit 1
+          else
+            echo "OK: no se ve -G en configs";
+          fi
 
       - name: Install fastlane + jq
         run: |
