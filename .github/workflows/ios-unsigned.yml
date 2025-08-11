@@ -39,30 +39,31 @@ jobs:
           pod repo update
           pod install --repo-update
 
-      # ⬇️ NUEVO: Bump de mínimos (Runner + AppFramework) a 15.0
+      # Bump de mínimos (Runner + AppFramework) a 15.0
       - name: Bump iOS minimums (Runner + AppFramework)
         shell: bash
         run: |
           /usr/bin/sed -i '' -E 's/(IPHONEOS_DEPLOYMENT_TARGET = )([0-9]+\.[0-9]+);/\115.0;/g' ios/Runner.xcodeproj/project.pbxproj
           /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 15.0" ios/Flutter/AppFrameworkInfo.plist || true
 
-      # Limpia cualquier -G que puedan meter Pods o configs antiguas
-      - name: Strip illegal -G from Pod xcconfigs
+      # Limpia cualquier token que empiece por -G en Pods y pbxproj
+      - name: Strip illegal -G* from configs
         shell: bash
         run: |
           set -e
-          # Todas las .xcconfig de Pods (soporta '-G' y '-G 0|1|..')
-          find ios/Pods -name "*.xcconfig" -print0 | xargs -0 /usr/bin/sed -i '' -E 's/(^|[[:space:]])-G([[:space:]]+[0-9]+)?([[:space:]]|$)/ /g' || true
-          # Por si queda en el pbxproj del Runner dentro de OTHER_CFLAGS
-          /usr/bin/sed -i '' -E 's/(OTHER_CFLAGS = [^;"]*)-G([[:space:]]*[0-9]+)?([^;"]*;)/\1\3/g' ios/Runner.xcodeproj/project.pbxproj || true
+          # Todas las .xcconfig de Pods: elimina tokens -G*
+          find ios/Pods -name "*.xcconfig" -print0 | \
+            xargs -0 /usr/bin/sed -i '' -E 's/(^|[[:space:]])-G[^[:space:]]*/ /g'
+          # Por si quedó en el pbxproj del Runner dentro de OTHER_*FLAGS
+          /usr/bin/sed -i '' -E 's/(OTHER_(CFLAGS|CPLUSPLUSFLAGS) = [^;"]*)-G[^;"]*/\1/g' ios/Runner.xcodeproj/project.pbxproj || true
 
-      - name: Sanity check CFLAGS (no -G)
+      - name: Sanity check CFLAGS (no -G*)
         shell: bash
         run: |
-          if grep -R --include=\*.{xcconfig,pbxproj} -nE '(^| )-G( |$)|(^| )-G[[:space:]]+[0-9]+' ios; then
-            echo "Aún aparece -G en alguna config"; exit 1
+          if grep -R --include=\*.{xcconfig,pbxproj} -nE '(^|[[:space:]])-G[^[:space:]]*' ios; then
+            echo "Aún aparece -G* en alguna config"; exit 1
           else
-            echo "OK: no se ve -G en configs";
+            echo "OK: no se ve -G* en configs";
           fi
 
       # Limpieza de DerivedData para un build fresco
@@ -88,7 +89,7 @@ jobs:
           echo "Runner SHA256:"; shasum -a 256 cert.p12
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
-      # Import fiable: reempaquetar el P12 y meterlo en un keychain dedicado
+      # Reempaquetar el P12 y meterlo en keychain dedicado (import robusto)
       - name: Create keychain & import identity (repack PKCS#12)
         shell: bash
         env:
