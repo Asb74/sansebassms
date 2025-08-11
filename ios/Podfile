@@ -66,6 +66,25 @@ post_install do |installer|
           config.build_settings['OTHER_CFLAGS'] =
             flags.split(' ').reject { |f| f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }.join(' ')
         end
+
+        # Xcode 16 introduce nuevas advertencias que hacen que targets como
+        # BoringSSL fallen al compilar porque sus flags tratan los warnings
+        # como errores (-Werror).  Eliminamos cualquier flag -Werror y
+        # desactivamos la conversión de warnings en errores para evitar que
+        # el archivado falle cuando CocoaPods incluye esas opciones.
+        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
+
+        %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS].each do |flag|
+          current = config.build_settings[flag]
+          case current
+          when Array
+            config.build_settings[flag] =
+              current.reject { |f| f.start_with?('-Werror') }
+          when String
+            config.build_settings[flag] =
+              current.split(' ').reject { |f| f.start_with?('-Werror') }.join(' ')
+          end
+        end
     end
   end
 end
