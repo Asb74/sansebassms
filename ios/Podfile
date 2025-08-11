@@ -66,14 +66,22 @@ post_install do |installer|
       config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
 
       %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS].each do |flag|
-        current = config.build_settings[flag]
-        case current
-        when Array
-          config.build_settings[flag] =
-            current.reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }
-        when String
-          config.build_settings[flag] =
-            current.split(' ').reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }.join(' ')
+        # Algunos pods (como BoringSSL) declaran flags específicos para
+        # arquitecturas o SDKs, p.ej. `OTHER_CFLAGS[sdk=iphoneos*]`.  Si sólo
+        # limpiamos la clave base, esos valores permanecen y Xcode sigue
+        # tratando los warnings como errores.  Por eso iteramos sobre todas las
+        # variantes de la clave y eliminamos cualquier flag problemático.
+        keys = config.build_settings.keys.grep(/^#{flag}(\[[^\]]+\])?$/)
+        keys.each do |key|
+          current = config.build_settings[key]
+          case current
+          when Array
+            config.build_settings[key] =
+              current.reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }
+          when String
+            config.build_settings[key] =
+              current.split(' ').reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }.join(' ')
+          end
         end
       end
     end
