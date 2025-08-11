@@ -69,12 +69,14 @@ post_install do |installer|
       # el archivado falle cuando CocoaPods incluye esas opciones.
         config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
 
-        %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS OTHER_SWIFT_FLAGS].each do |flag|
+        %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS OTHER_SWIFT_FLAGS OTHER_LDFLAGS].each do |flag|
           # Algunos pods (como BoringSSL) declaran flags específicos para
-          # arquitecturas o SDKs, p.ej. `OTHER_CFLAGS[sdk=iphoneos*]`.  Si sólo
+          # arquitecturas o SDKs, p.ej. `OTHER_CFLAGS[sdk=iphoneos*]`. Si sólo
           # limpiamos la clave base, esos valores permanecen y Xcode sigue
-          # tratando los warnings como errores.  Por eso iteramos sobre todas las
-          # variantes de la clave y eliminamos cualquier flag problemático.
+          # tratando los warnings como errores. Por eso iteramos sobre todas las
+          # variantes de la clave y eliminamos cualquier flag problemático,
+          # incluido el obsoleto `GCC_WARN_INHIBIT_ALL_WARNINGS` que genera la
+          # opción no soportada "-G" en Xcode 16.
         keys = config.build_settings.keys.grep(/^#{flag}(\[[^\]]+\])?$/)
         keys.each do |key|
           current = config.build_settings[key]
