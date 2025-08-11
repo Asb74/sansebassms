@@ -15,10 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 15.4
+      - name: Select Xcode 16.2
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.4'   # stable version installed on the runner
+          xcode-version: '16.2'   # use Xcode 16 with iOS 18 SDK
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -30,7 +30,7 @@ jobs:
 
       - name: Verify Xcode version
         run: |
-          EXPECTED="Xcode 15.4"
+          EXPECTED="Xcode 16.2"
           ACTUAL=$(xcodebuild -version | head -n 1)
           echo "$ACTUAL"
           if [[ "$ACTUAL" != "$EXPECTED" ]]; then
