@@ -1,4 +1,7 @@
-platform :ios, '15.0'
+# Uncomment this line to define a global platform for your project
+platform :ios, '13.0'
+
+# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -8,32 +11,41 @@ project 'Runner', {
 }
 
 def flutter_root
-  env_root = ENV['FLUTTER_ROOT']
-  return env_root unless env_root.nil? || env_root.empty?
-  generated = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
-  unless File.exist?(generated)
-    raise "#{generated} no existe. Ejecuta 'flutter pub get' primero."
+  generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
+  unless File.exist?(generated_xcode_build_settings_path)
+    raise "#{generated_xcode_build_settings_path} must exist. If you're running pod install manually, make sure flutter pub get is executed first"
   end
-  File.foreach(generated) do |line|
-    m = line.match(/FLUTTER_ROOT\=(.*)/)
-    return m[1].strip.gsub('\\', '/') if m
+
+  File.foreach(generated_xcode_build_settings_path) do |line|
+    matches = line.match(/FLUTTER_ROOT\=(.*)/)
+    return matches[1].strip if matches
   end
-  raise "FLUTTER_ROOT no encontrado en #{generated}."
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. Try deleting Generated.xcconfig, then run flutter pub get"
 end
 
-require File.expand_path(File.join(flutter_root, 'packages', 'flutter_tools', 'bin', 'podhelper'), __FILE__)
+require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
+
 flutter_ios_podfile_setup
 
 target 'Runner' do
-  use_frameworks! :linkage => :static
+  use_frameworks!
   use_modular_headers!
 
-  # ❌ No fijamos pods de Firebase aquí. Deja que FlutterFire resuelva 11.x.
+  pod 'Firebase/Analytics', :modular_headers => true
+  pod 'Firebase/Auth', :modular_headers => true
+  pod 'Firebase/Core', :modular_headers => true
+  pod 'Firebase/Firestore', :modular_headers => true
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
+
+  target 'RunnerTests' do
+    inherit! :search_paths
+  end
 end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
+    flutter_additional_ios_build_settings(target)
     if target.name == 'BoringSSL-GRPC'
       target.source_build_phase.files.each do |file|
         if file.settings && file.settings['COMPILER_FLAGS']

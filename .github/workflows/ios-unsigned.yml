@@ -45,6 +45,7 @@ jobs:
           cd ios
           # Update the CocoaPods repo to ensure podspec patches like the
           # removal of deprecated `GCC_WARN_INHIBIT_ALL_WARNINGS` are pulled in.
+          pod repo update
           pod install --repo-update
 
       - name: Install fastlane & jq
