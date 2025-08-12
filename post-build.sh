@@ -12,15 +12,17 @@ ls ios >> build_log.txt 2>&1
 echo "[3] Intentando pod install..." >> build_log.txt
 cd ios
 pod install >> ../build_log.txt 2>&1
+echo "[4] Versiones de gRPC/BoringSSL/abseil/Firebase:" >> ../build_log.txt
+grep -E "gRPC|BoringSSL|abseil|Firebase" Podfile.lock >> ../build_log.txt 2>&1
 cd ..
 
-echo "[4] flutter pub get..." >> build_log.txt
+echo "[5] flutter pub get..." >> build_log.txt
 flutter pub get >> build_log.txt 2>&1
 
-echo "[5] Contenido de .flutter-plugins-dependencies:" >> build_log.txt
+echo "[6] Contenido de .flutter-plugins-dependencies:" >> build_log.txt
 cat .flutter-plugins-dependencies >> build_log.txt 2>&1
 
-echo "[6] Contenido de pubspec.yaml:" >> build_log.txt
+echo "[7] Contenido de pubspec.yaml:" >> build_log.txt
 cat pubspec.yaml >> build_log.txt 2>&1
 
 echo "===== POST BUILD SCRIPT FINALIZADO =====" >> build_log.txt
