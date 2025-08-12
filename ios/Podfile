@@ -34,64 +34,14 @@ end
 
 post_install do |installer|
   installer.pods_project.targets.each do |target|
-    # Ajustes de Flutter
-    flutter_additional_ios_build_settings(target)
-
-    target.build_configurations.each do |config|
-      # Mantén el mínimo que ya estabas usando
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
-        config.build_settings['SWIFT_VERSION'] = '5.9'
-        config.build_settings['ENABLE_BITCODE'] = 'NO'
-        config.build_settings['SWIFT_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-        if config.name == 'Debug'
-        config.build_settings['SWIFT_OPTIMIZATION_LEVEL'] = '-Onone'
-        end
-
-      # Desactivar firma en TODOS los Pods
-      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
-      config.build_settings['CODE_SIGNING_REQUIRED'] = 'NO'
-      config.build_settings['CODE_SIGNING_IDENTITY'] = ''
-      config.build_settings['PROVISIONING_PROFILE_SPECIFIER'] = ''
-      config.build_settings['PROVISIONING_PROFILE'] = ''
-      config.build_settings['DEVELOPMENT_TEAM'] = ''
-
-      # Remove invalid compiler flag added by some pods that causes
-      # "unsupported option '-G'" errors when building with Xcode 16.
-      # Some pods inject the deprecated `GCC_WARN_INHIBIT_ALL_WARNINGS`
-      # build setting which Xcode 16 turns into an unsupported `-G` flag.
-      # Strip the setting and any lingering `-G` flags to keep clang happy.
-      config.build_settings.delete('GCC_WARN_INHIBIT_ALL_WARNINGS')
-
-      # Xcode 16 introduce nuevas advertencias que hacen que targets como
-      # BoringSSL fallen al compilar porque sus flags tratan los warnings
-      # como errores (-Werror).  Eliminamos cualquier flag -Werror y
-      # desactivamos la conversión de warnings en errores para evitar que
-      # el archivado falle cuando CocoaPods incluye esas opciones.
-        config.build_settings['GCC_TREAT_WARNINGS_AS_ERRORS'] = 'NO'
-
-        %w[OTHER_CFLAGS OTHER_CPLUSPLUSFLAGS OTHER_SWIFT_FLAGS OTHER_LDFLAGS].each do |flag|
-          # Algunos pods (como BoringSSL) declaran flags específicos para
-          # arquitecturas o SDKs, p.ej. `OTHER_CFLAGS[sdk=iphoneos*]`. Si sólo
-          # limpiamos la clave base, esos valores permanecen y Xcode sigue
-          # tratando los warnings como errores. Por eso iteramos sobre todas las
-          # variantes de la clave y eliminamos cualquier flag problemático,
-          # incluido el obsoleto `GCC_WARN_INHIBIT_ALL_WARNINGS` que genera la
-          # opción no soportada "-G" en Xcode 16.
-        keys = config.build_settings.keys.grep(/^#{flag}(\[[^\]]+\])?$/)
-        keys.each do |key|
-          current = config.build_settings[key]
-            case current
-            when Array
-              config.build_settings[key] =
-                current.reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }
-            when String
-              config.build_settings[key] =
-                current.split(' ').reject { |f| f == '-G' || f == '-GCC_WARN_INHIBIT_ALL_WARNINGS' || f.start_with?('-Werror') }.join(' ')
-            end
-          end
+    if target.name == 'BoringSSL-GRPC'
+      target.source_build_phase.files.each do |file|
+        if file.settings && file.settings['COMPILER_FLAGS']
+          flags = file.settings['COMPILER_FLAGS'].split
+          flags.reject! { |flag| flag == '-GCC_WARN_INHIBIT_ALL_WARNINGS' }
+          file.settings['COMPILER_FLAGS'] = flags.join(' ')
         end
       end
     end
   end
-
-
+end
