@@ -31,6 +31,7 @@ target 'Runner' do
   use_frameworks! :linkage => :static
   use_modular_headers!
 
+  pod 'Firebase', :modular_headers => true
   pod 'Firebase/Analytics', :modular_headers => true
   pod 'Firebase/Auth', :modular_headers => true
   pod 'Firebase/Core', :modular_headers => true
