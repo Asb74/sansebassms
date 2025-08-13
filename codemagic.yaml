@@ -9,6 +9,7 @@ workflows:
         BUNDLE_ID: com.example.sansebassms
       groups:
         - app_store_connect
+        - ios_signing
     scripts:
       - name: Pre-build (deps, pods, firma, logging)
         script: |
@@ -16,16 +17,15 @@ workflows:
           ./pre-build.sh
       - name: Setup signing
         script: |
-          ./setup-signing.sh
+          bash -xe ./setup-signing.sh
       - name: Build IPA
         script: |
-          ./build-ipa.sh
+          bash -xe ./build-ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa
-      - codemagic_prebuild.log
+      - build/ios/ipa/*.dSYM.zip
       - codemagic_setup_signing.log
       - codemagic_build_ipa.log
-      - artifacts/*
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
