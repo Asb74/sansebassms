@@ -10,21 +10,20 @@ workflows:
         APPLE_TEAM_ID: 7QWJ8R3ZB5
         CERTIFICATE_P12_BASE64: $CERTIFICATE_P12_BASE64
         P12_PASSWORD: $P12_PASSWORD
-        KEYCHAIN_PASSWORD: $KEYCHAIN_PASSWORD
       groups:
         - app_store_connect
     scripts:
       - name: Pre-build (deps, pods, firma, logging)
         script: |
-          chmod +x ./pre-build.sh
+          chmod +x pre-build.sh
           ./pre-build.sh
       - name: Setup signing
         script: |
-          chmod +x ./setup-signing.sh
+          chmod +x setup-signing.sh
           ./setup-signing.sh
       - name: Build IPA
         script: |
-          chmod +x ./build-ipa.sh
+          chmod +x build-ipa.sh
           ./build-ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa
