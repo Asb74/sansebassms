@@ -1,23 +1,27 @@
 workflows:
-  ios-release:
-    name: iOS Release
+  ios_release:
+    name: iOS Release (Xcode 16.2)
     environment:
-      flutter: stable
       xcode: 16.2
-      cocoapods: 1.16.2
+      flutter: stable
+      vars:
+        BUNDLE_ID: com.example.sansebassms
       groups:
         - app_store_connect
     scripts:
-      - name: Pre-build
-        script: ./pre-build.sh
-      - name: Build IPA
-        script: flutter build ipa --release --export-options-plist ExportOptions.plist
-      - name: Publish to TestFlight
+      - name: Pre-build (deps, pods, firma)
         script: |
-          app-store-connect publish \
-            --api-key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            build/ios/ipa/*.ipa
+          chmod +x ./pre-build.sh
+          ./pre-build.sh
+      - name: Build IPA (Release, firma Distribución)
+        script: |
+          flutter build ipa --release --export-options-plist /Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
+      - artifacts/*
+    publishing:
+      app_store_connect:
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        submit_to_testflight: true
