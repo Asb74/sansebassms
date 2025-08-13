@@ -14,13 +14,72 @@ workflows:
         script: |
           chmod +x ./pre-build.sh
           ./pre-build.sh
+      - name: Setup signing
+        script: |
+          set -e
+          keychain create
+          keychain activate
+          if [ -n "${CERTIFICATE_P12_BASE64:-}" ] && [ -n "${P12_PASSWORD:-}" ]; then
+            echo "$CERTIFICATE_P12_BASE64" | base64 -d > cert.p12
+            keychain add-certificates --certificate cert.p12 --certificate-password "$P12_PASSWORD"
+            if [ -n "${PROVISIONING_PROFILE_BASE64:-}" ]; then
+              mkdir -p ~/signing
+              echo "$PROVISIONING_PROFILE_BASE64" | base64 -d > ~/signing/app.mobileprovision
+            else
+              app-store-connect fetch-signing-files \
+                --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+                --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+                --key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+                --type IOS_APP_STORE \
+                --bundle-id "$BUNDLE_ID" \
+                --output ~/signing
+            fi
+          else
+            app-store-connect fetch-signing-files \
+              --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+              --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+              --key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+              --type IOS_APP_STORE \
+              --bundle-id "$BUNDLE_ID" \
+              --output ~/signing
+            CERT_PATH=$(find ~/signing -name "*.p12" -print -quit || true)
+            if [ -z "$CERT_PATH" ]; then
+              echo "No distribution certificate with private key found. Creating a new one."
+              openssl genrsa -out ~/signing/dist.key 2048
+              openssl req -new -key ~/signing/dist.key -out ~/signing/dist.csr -subj "/CN=Codemagic"
+              app-store-connect certificates create \
+                --type IOS_DISTRIBUTION \
+                --csr-file ~/signing/dist.csr \
+                --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+                --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+                --key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+                --output ~/signing/dist.cer
+              if [ -z "${P12_PASSWORD:-}" ]; then
+                P12_PASSWORD="$(openssl rand -base64 12)"
+              fi
+              openssl pkcs12 -export \
+                -inkey ~/signing/dist.key \
+                -in ~/signing/dist.cer \
+                -out ~/signing/dist.p12 \
+                -passout pass:"$P12_PASSWORD"
+              CERT_PATH=~/signing/dist.p12
+              CERT_PASS="$P12_PASSWORD"
+            else
+              CERT_PASS=$(cat ~/signing/certificate_password.txt)
+            fi
+            keychain add-certificates --certificate "$CERT_PATH" --certificate-password "$CERT_PASS"
+          fi
+          xcode-project use-profiles --signing-settings ~/signing
+          security find-identity -v -p codesigning > codesign_diag.log
+          security find-generic-password -a "Apple Distribution" >> codesign_diag.log 2>&1
       - name: Build IPA (Release)
         script: |
           flutter build ipa --release --export-options-plist /Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - artifacts/*
-      - codemagic_prebuild.log
+      - prebuild.log
+      - codesign_diag.log
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY

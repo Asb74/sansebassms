@@ -1,119 +1,61 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# Global log file at repository root
 ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-LOG_FILE="$ROOT_DIR/codemagic_prebuild.log"
+LOG_FILE="$ROOT_DIR/prebuild.log"
 mkdir -p "$ROOT_DIR"
 : >"$LOG_FILE"
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 echo "Starting pre-build script"
 
-# Ensure required environment variables are present
-missing_env=false
-for var in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER \
-           APP_STORE_CONNECT_PRIVATE_KEY BUNDLE_ID; do
+missing=false
+for var in APPLE_TEAM_ID BUNDLE_ID; do
   if [ -z "${!var:-}" ]; then
     echo "ERROR: Missing required env var: $var"
-    missing_env=true
+    missing=true
   fi
 done
 
-if [ "$missing_env" = true ]; then
-  echo "Pre-build aborted due to missing environment variables." >&2
-  mkdir -p artifacts
-  cp "$LOG_FILE" artifacts/ || true
+has_api=true
+for var in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY; do
+  if [ -z "${!var:-}" ]; then
+    has_api=false
+    break
+  fi
+done
+
+has_p12=true
+for var in CERTIFICATE_P12_BASE64 P12_PASSWORD; do
+  if [ -z "${!var:-}" ]; then
+    has_p12=false
+    break
+  fi
+done
+
+if [ "$missing" = true ]; then
+  echo "Pre-build aborted due to missing mandatory environment variables." >&2
   exit 2
 fi
 
-echo "Flutter: $(flutter --version)"
-echo "Ruby: $(ruby -v)"
-echo "CocoaPods: $(pod --version)"
-xcodebuild -version
+if [ "$has_api" = false ] && [ "$has_p12" = false ]; then
+  echo "ERROR: Provide App Store Connect API credentials or CERTIFICATE_P12_BASE64 and P12_PASSWORD." >&2
+  exit 2
+fi
 
-# Fetch project dependencies and iOS artifacts
+echo "Flutter: $(flutter --version 2>/dev/null || echo 'not installed')"
+echo "Ruby: $(ruby -v 2>/dev/null || echo 'not installed')"
+echo "CocoaPods: $(pod --version 2>/dev/null || echo 'not installed')"
+xcodebuild -version 2>/dev/null || true
+
 flutter pub get
 flutter precache --ios
 
-# Force iOS 15 deployment target in the Xcode project
 /usr/bin/sed -i '' -E "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g" \
   ios/Runner.xcodeproj/project.pbxproj
 
-# Install CocoaPods
 pushd ios >/dev/null
 pod install --repo-update
 popd >/dev/null
-
-# Fetch signing files using explicit credentials
-# crear fichero temporal con permisos seguros
-umask 077
-API_KEY_FILE="$(mktemp -t asc_key_XXXXXX.p8)"
-# escribir la variable tal cual (multilínea)
-printf "%s\n" "$APP_STORE_CONNECT_PRIVATE_KEY" > "$API_KEY_FILE"
-# saneo CRLF por si la variable viene con retornos de carro de Windows
-tr -d '\r' < "$API_KEY_FILE" > "${API_KEY_FILE}.tmp" && mv "${API_KEY_FILE}.tmp" "$API_KEY_FILE"
-# validar que es una clave válida (no imprime datos sensibles)
-if ! openssl pkey -in "$API_KEY_FILE" -noout >/dev/null 2>&1; then
-  echo "ERROR: APP_STORE_CONNECT_PRIVATE_KEY no es un .p8 válido"
-  rm -f "$API_KEY_FILE"
-  exit 2
-fi
-
-# usar la clave leyendo el fichero (mantiene saltos de línea correctos)
-app-store-connect fetch-signing-files "$BUNDLE_ID" \
-  --type IOS_APP_STORE \
-  --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-  --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-  --private-key "$(cat "$API_KEY_FILE")" \
-  --create
-
-# limpiar al final (aunque el contenedor es efímero)
-rm -f "$API_KEY_FILE"
-
-# Initialize keychain and attempt to import existing certificates
-keychain initialize
-CERT_LOG=$(mktemp)
-if ! keychain add-certificates > >(tee "$CERT_LOG") 2>&1; then
-  true # continue; errors handled by checking log
-fi
-
-if grep -q "Cannot save Signing Certificates without certificate private key" "$CERT_LOG"; then
-  echo "No private key for existing certificates. Generating new distribution certificate." >&2
-  openssl genrsa -out dist.key 2048
-  openssl req -new -key dist.key -out dist.csr -subj "/CN=Dist Cert"
-  app-store-connect certificates create \
-    --type IOS_DISTRIBUTION \
-    --csr-file dist.csr \
-    --output dist.cer \
-    --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-    --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-    --private-key "$APP_STORE_CONNECT_PRIVATE_KEY"
-
-  if [ -z "${P12_PASSWORD:-}" ]; then
-    P12_PASSWORD="$(openssl rand -base64 12)"
-    mkdir -p artifacts
-    echo "$P12_PASSWORD" > artifacts/secret_hint.txt
-    echo "Generated random P12_PASSWORD and stored hint at artifacts/secret_hint.txt"
-  fi
-
-  openssl pkcs12 -export -inkey dist.key -in dist.cer -out dist.p12 \
-    -passout pass:"$P12_PASSWORD"
-  security import dist.p12 -k "$HOME/Library/codemagic-cli-tools/keychains/login.keychain-db" \
-    -P "$P12_PASSWORD" -T /usr/bin/codesign
-fi
-
-# Configure Xcode project with fetched provisioning profiles
-xcode-project use-profiles
-
-# Diagnostics for debugging signing issues
-security find-identity -v -p codesigning || true
-ls -la "$HOME/Library/MobileDevice/Provisioning Profiles/" || true
-
-# Collect useful artifacts for debugging
-mkdir -p artifacts
-cp ios/Podfile.lock artifacts/ || true
-grep -E "gRPC|BoringSSL|Firebase|abseil" ios/Podfile.lock | tee artifacts/pods-versions.txt || true
-cp "$LOG_FILE" artifacts/ || true
 
 echo "Pre-build script completed"
