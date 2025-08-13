@@ -7,18 +7,19 @@ workflows:
       vars:
         BUNDLE_ID: com.example.sansebassms
       groups:
-        - app_store_connect # Contains APP_STORE_CONNECT_* and related signing variables
+        - app_store_connect
     scripts:
-      - name: Pre-build (deps, pods, firma)
+      - name: Pre-build (deps, pods, firma, logging)
         script: |
           chmod +x ./pre-build.sh
           ./pre-build.sh
-      - name: Build IPA (Release, firma Distribución)
+      - name: Build IPA (Release)
         script: |
           flutter build ipa --release --export-options-plist /Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
       - artifacts/*
+      - codemagic_prebuild.log
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
