@@ -10,16 +10,26 @@ xcodebuild -version
 flutter pub get
 flutter precache --ios
 
-# 2) Force iOS 18 in Runner (project file)
-/usr/bin/sed -i '' -E "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+/IPHONEOS_DEPLOYMENT_TARGET = 18.0/g" ios/Runner.xcodeproj/project.pbxproj
+# 2) Ensure Runner project targets iOS 15.0 minimum
+/usr/bin/sed -i '' -E \
+  "s/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]+/IPHONEOS_DEPLOYMENT_TARGET = 15.0/g" \
+  ios/Runner.xcodeproj/project.pbxproj
 
 # 3) Clean and install Pods
 cd ios
 rm -rf Pods Podfile.lock
 pod install --repo-update
+# Quick verification of pod and xcconfig resolution
+grep -E "Pods-Runner\.(debug|release|profile)\.xcconfig" Flutter/*.xcconfig || true
+grep -E "BoringSSL|gRPC|Firebase|abseil" Podfile.lock || true
 cd ..
 
 # 4) Automatic distribution signing
+# Check required App Store Connect variables are present
+: "${APP_STORE_CONNECT_ISSUER_ID:?Missing APP_STORE_CONNECT_ISSUER_ID}"
+: "${APP_STORE_CONNECT_KEY_IDENTIFIER:?Missing APP_STORE_CONNECT_KEY_IDENTIFIER}"
+: "${APP_STORE_CONNECT_PRIVATE_KEY:?Missing APP_STORE_CONNECT_PRIVATE_KEY}"
+echo "Using App Store Connect issuer: $APP_STORE_CONNECT_ISSUER_ID"
 app-store-connect fetch-signing-files "$BUNDLE_ID" --type IOS_APP_STORE --create
 keychain initialize
 keychain add-certificates

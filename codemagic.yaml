@@ -7,7 +7,7 @@ workflows:
       vars:
         BUNDLE_ID: com.example.sansebassms
       groups:
-        - app_store_connect
+        - app_store_connect # Contains APP_STORE_CONNECT_* and related signing variables
     scripts:
       - name: Pre-build (deps, pods, firma)
         script: |
