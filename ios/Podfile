@@ -44,13 +44,11 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '18.0'
       config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-      # gRPC's core library now leverages C++20 features such as concepts and
-      # requires expressions. Building with an older C++ standard causes parse
-      # errors like "A template argument list is expected after a name prefixed by the template keyword"
-      # during the iOS archive step. Explicitly compiling Pods with the C++20
-      # standard resolves these issues while remaining compatible with the rest
-      # of the project.
-      config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+      # Build CocoaPods with the C++17 standard. gRPC and some transitive
+      # dependencies still rely on APIs such as std::result_of that were removed
+      # in C++20, so targeting C++17 avoids the Clang compilation errors
+      # encountered during the iOS archive step.
+      config.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++17'
     end
     if target.name == 'BoringSSL-GRPC'
       target.source_build_phase.files.each do |file|
