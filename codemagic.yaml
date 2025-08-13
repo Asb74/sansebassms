@@ -1,3 +1,4 @@
+# Codemagic workflow configuration for iOS release builds
 workflows:
   ios_release:
     name: iOS Release (Xcode 16.2)
