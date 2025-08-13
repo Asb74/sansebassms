@@ -10,10 +10,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  firebase_core: ^2.27.1
-  firebase_auth: ^4.17.9
-  cloud_firestore: ^4.15.9
-  firebase_messaging: ^14.7.21
+  firebase_core: ^4.0.0
+  firebase_auth: ^6.0.1
+  cloud_firestore: ^6.0.0
+  firebase_messaging: ^16.0.0
 
 # Pod build fix for Xcode 16
 # Keeping firebase packages current ensures their podspecs do not include
