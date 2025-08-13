@@ -7,9 +7,12 @@ workflows:
       flutter: stable
       vars:
         BUNDLE_ID: com.example.sansebassms
+        APPLE_TEAM_ID: 7QWJ8R3ZB5
+        CERTIFICATE_P12_BASE64: $CERTIFICATE_P12_BASE64
+        P12_PASSWORD: $P12_PASSWORD
+        KEYCHAIN_PASSWORD: $KEYCHAIN_PASSWORD
       groups:
         - app_store_connect
-        - ios_signing
     scripts:
       - name: Pre-build (deps, pods, firma, logging)
         script: |
@@ -17,15 +20,18 @@ workflows:
           ./pre-build.sh
       - name: Setup signing
         script: |
-          bash -xe ./setup-signing.sh
+          chmod +x ./setup-signing.sh
+          ./setup-signing.sh
       - name: Build IPA
         script: |
-          bash -xe ./build-ipa.sh
+          chmod +x ./build-ipa.sh
+          ./build-ipa.sh
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.dSYM.zip
+      - codemagic_prebuild.log
       - codemagic_setup_signing.log
       - codemagic_build_ipa.log
+      - artifacts/*
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
