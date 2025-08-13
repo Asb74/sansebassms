@@ -46,12 +46,30 @@ pod install --repo-update
 popd >/dev/null
 
 # Fetch signing files using explicit credentials
+# crear fichero temporal con permisos seguros
+umask 077
+API_KEY_FILE="$(mktemp -t asc_key_XXXXXX.p8)"
+# escribir la variable tal cual (multilínea)
+printf "%s\n" "$APP_STORE_CONNECT_PRIVATE_KEY" > "$API_KEY_FILE"
+# saneo CRLF por si la variable viene con retornos de carro de Windows
+tr -d '\r' < "$API_KEY_FILE" > "${API_KEY_FILE}.tmp" && mv "${API_KEY_FILE}.tmp" "$API_KEY_FILE"
+# validar que es una clave válida (no imprime datos sensibles)
+if ! openssl pkey -in "$API_KEY_FILE" -noout >/dev/null 2>&1; then
+  echo "ERROR: APP_STORE_CONNECT_PRIVATE_KEY no es un .p8 válido"
+  rm -f "$API_KEY_FILE"
+  exit 2
+fi
+
+# usar la clave leyendo el fichero (mantiene saltos de línea correctos)
 app-store-connect fetch-signing-files "$BUNDLE_ID" \
   --type IOS_APP_STORE \
   --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
   --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-  --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+  --private-key "$(cat "$API_KEY_FILE")" \
   --create
+
+# limpiar al final (aunque el contenedor es efímero)
+rm -f "$API_KEY_FILE"
 
 # Initialize keychain and attempt to import existing certificates
 keychain initialize
