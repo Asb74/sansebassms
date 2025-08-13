@@ -14,39 +14,28 @@ require() {
   fi
 }
 
-for v in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY BUNDLE_ID TEAM_ID; do
+for v in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STORE_CONNECT_PRIVATE_KEY BUNDLE_ID APPLE_TEAM_ID; do
   require "$v"
 done
 
-# APPLE_CERTIFICATE_PRIVATE_KEY required unless using manual P12
-if [ -z "${CERTIFICATE_PATH:-}" ]; then
-  require APPLE_CERTIFICATE_PRIVATE_KEY
+# Initialize ephemeral/default keychain
+if [ -n "${KEYCHAIN_PASSWORD:-}" ]; then
+  keychain initialize --password "$KEYCHAIN_PASSWORD"
+else
+  keychain initialize
 fi
 
-# Initialize ephemeral/default keychain
-keychain initialize
-
-if [ -n "${CERTIFICATE_PATH:-}" ] && [ -n "${CERTIFICATE_PASSWORD:-}" ]; then
+if [ -n "${CERTIFICATE_P12_BASE64:-}" ] && [ -n "${P12_PASSWORD:-}" ]; then
   echo "Importing provided P12 certificate"
-  keychain add-certificates --certificate "$CERTIFICATE_PATH" --certificate-password @env:CERTIFICATE_PASSWORD
+  keychain add-certificates --certificate-base64 "$CERTIFICATE_P12_BASE64" --certificate-password "$P12_PASSWORD"
 else
   echo "Fetching signing files from App Store Connect"
-  if app-store-connect fetch-signing-files --help 2>&1 | grep -q -- '--create'; then
-    app-store-connect fetch-signing-files \
-      --issuer-id @env:APP_STORE_CONNECT_ISSUER_ID \
-      --key-id @env:APP_STORE_CONNECT_KEY_IDENTIFIER \
-      --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY \
-      --certificate-key @env:APPLE_CERTIFICATE_PRIVATE_KEY \
-      @env:BUNDLE_ID \
-      --create
-  else
-    app-store-connect fetch-signing-files \
-      --issuer-id @env:APP_STORE_CONNECT_ISSUER_ID \
-      --key-id @env:APP_STORE_CONNECT_KEY_IDENTIFIER \
-      --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY \
-      --certificate-key @env:APPLE_CERTIFICATE_PRIVATE_KEY \
-      @env:BUNDLE_ID
-  fi
+  app-store-connect fetch-signing-files \
+    --issuer-id @env:APP_STORE_CONNECT_ISSUER_ID \
+    --key-id @env:APP_STORE_CONNECT_KEY_IDENTIFIER \
+    --private-key @env:APP_STORE_CONNECT_PRIVATE_KEY \
+    --team-id @env:APPLE_TEAM_ID \
+    @env:BUNDLE_ID
 fi
 
 # Show resulting certificates and profiles
