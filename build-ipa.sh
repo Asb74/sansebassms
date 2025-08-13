@@ -9,6 +9,6 @@ echo "== Build IPA =="
 xcode-project use-profiles
 flutter build ipa --release --export-options-plist /Users/builder/export_options.plist
 
-mkdir -p artifacts
-cp "$LOG_FILE" artifacts/ || true
+mkdir -p "$ROOT_DIR/artifacts"
+cp "$LOG_FILE" "$ROOT_DIR/artifacts/" || true
 echo "Build IPA DONE"
