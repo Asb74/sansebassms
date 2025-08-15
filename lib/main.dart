@@ -23,15 +23,24 @@ void main() async {
 
 Future<void> _initNotifications() async {
   const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const initSettings = InitializationSettings(android: androidSettings);
-  await flutterLocalNotificationsPlugin.initialize(
-    initSettings,
-    onDidReceiveNotificationResponse: (response) {
-      if (response.payload == "abrir_usuario_screen") {
-        navigatorKey.currentState?.pushNamed("/usuario");
-      }
-    },
+  const iosSettings = DarwinInitializationSettings();
+  const initSettings = InitializationSettings(
+    android: androidSettings,
+    iOS: iosSettings,
   );
+  try {
+    await flutterLocalNotificationsPlugin.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (response) {
+        if (response.payload == "abrir_usuario_screen") {
+          navigatorKey.currentState?.pushNamed("/usuario");
+        }
+      },
+    );
+  } catch (e) {
+    // Avoid blocking app startup if notifications fail to initialize
+    debugPrint('Notification init failed: $e');
+  }
 }
 
 class SansebasSmsApp extends StatelessWidget {
