@@ -33,7 +33,8 @@ PLIST_PATH="ios/Runner/GoogleService-Info.plist"
 if [[ -n "${GOOGLE_SERVICE_INFO_PLIST_B64:-}" ]]; then
   echo "Processing GOOGLE_SERVICE_INFO_PLIST_B64..."
   mkdir -p ios/Runner
-  if printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > "$PLIST_PATH.tmp" 2>/dev/null; then
+  if printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > "$PLIST_PATH.tmp" 2>/dev/null \
+    || printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 -d > "$PLIST_PATH.tmp" 2>/dev/null; then
     mv "$PLIST_PATH.tmp" "$PLIST_PATH"
     echo "Decoded Base64 plist"
   elif grep -q '<plist' <<<"$GOOGLE_SERVICE_INFO_PLIST_B64"; then
