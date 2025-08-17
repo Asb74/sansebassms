@@ -5,26 +5,10 @@ workflows:
         - app_store_connect
       xcode: latest
     scripts:
-      - name: Generar GoogleService-Info.plist
+      - name: Generar GoogleService-Info.plist (seguro)
         script: |
           set -euo pipefail
-          mkdir -p build_logs
-          echo "=== INICIO: GoogleService-Info.plist ===" | tee -a build_logs/prebuild.log
-          mkdir -p ios/Runner
-          VAR="${GOOGLE_SERVICE_INFO_PLIST:-}"
-          if [[ -z "${VAR}" ]]; then
-            echo "GOOGLE_SERVICE_INFO_PLIST vacío" | tee -a build_logs/prebuild.log
-            exit 1
-          fi
-          if [[ "${VAR}" =~ ^\<\?xml ]]; then
-            echo "${VAR}" > ios/Runner/GoogleService-Info.plist
-            echo "Es XML en claro" | tee -a build_logs/prebuild.log
-          else
-            echo "${VAR}" | base64 --decode > ios/Runner/GoogleService-Info.plist
-            echo "Decodificado desde base64" | tee -a build_logs/prebuild.log
-          fi
-          ls -l ios/Runner/GoogleService-Info.plist | tee -a build_logs/prebuild.log
-          head -n 6 ios/Runner/GoogleService-Info.plist | tee -a build_logs/prebuild.log
+          bash tool/prebuild_plist.sh
 
       - name: Instalar dependencias y CocoaPods
         script: |
