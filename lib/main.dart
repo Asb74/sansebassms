@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 import 'data/app_database.dart';
 
@@ -41,7 +42,8 @@ Future<void> main() async {
       print('Running without Firebase (NO_FIREBASE=true)');
     }
     await _initNotifications();
-    runApp(const _BootstrapGuard(child: SansebasSmsApp()));
+    await Hive.initFlutter();
+    runApp(FirstFrameGate(child: const MyApp()));
   }, (error, stack) {
     // Última barrera de errores
     // ignore: avoid_print
@@ -71,8 +73,8 @@ Future<void> _initNotifications() async {
   }
 }
 
-class SansebasSmsApp extends StatelessWidget {
-  const SansebasSmsApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   Future<Widget> _decidirPantallaInicial() async {
     final db = await AppDatabase.instance.database;
@@ -154,28 +156,34 @@ class SansebasSmsApp extends StatelessWidget {
   }
 }
 
-class _BootstrapGuard extends StatefulWidget {
-  const _BootstrapGuard({super.key, required this.child});
+class FirstFrameGate extends StatefulWidget {
+  const FirstFrameGate({super.key, required this.child});
   final Widget child;
 
   @override
-  State<_BootstrapGuard> createState() => _BootstrapGuardState();
+  State<FirstFrameGate> createState() => _FirstFrameGateState();
 }
 
-class _BootstrapGuardState extends State<_BootstrapGuard> {
+class _FirstFrameGateState extends State<FirstFrameGate> {
+  bool _firstFrameSeen = false;
   bool _timeout = false;
 
   @override
   void initState() {
     super.initState();
-    Future.delayed(const Duration(seconds: 5), () {
-      if (mounted) setState(() => _timeout = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _firstFrameSeen = true;
+    });
+    Timer(const Duration(seconds: 5), () {
+      if (!_firstFrameSeen && mounted) {
+        setState(() => _timeout = true);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_timeout) {
+    if (_timeout && !_firstFrameSeen) {
       return MaterialApp(
         home: Scaffold(
           body: Center(

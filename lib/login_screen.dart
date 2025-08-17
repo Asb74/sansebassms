@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'home_screen.dart';
 import 'screens/usuario_screen.dart';
+import 'data/bootstrap_repo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -231,80 +232,91 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("SansebasSms - Iniciar Sesión")),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              TextField(
-                controller: _correoController,
-                decoration: const InputDecoration(labelText: "Correo"),
-              ),
-              TextField(
-                controller: _contrasenaController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Contraseña"),
-              ),
-              TextField(
-                controller: _confirmarContrasenaController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: "Confirmar Contraseña"),
-              ),
-              TextField(
-                controller: _dniController,
-                decoration: const InputDecoration(labelText: "DNI o NIE"),
-              ),
-              TextField(
-                controller: _telefonoController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(labelText: "Teléfono"),
-              ),
-              const SizedBox(height: 12),
-              if (_textoLPD != null && _textoLPD!.isNotEmpty) ...[
-                Text(
-                  _textoLPD!,
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  textAlign: TextAlign.center,
-                ),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _aceptaLPD,
-                      onChanged: (val) {
-                        setState(() {
-                          _aceptaLPD = val ?? false;
-                        });
-                      },
+    return FutureBuilder(
+      future: BootstrapRepo.ensureBoxes(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        return Scaffold(
+          appBar: AppBar(title: const Text("SansebasSms - Iniciar Sesión")),
+          body: Padding(
+            padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _correoController,
+                    decoration: const InputDecoration(labelText: "Correo"),
+                  ),
+                  TextField(
+                    controller: _contrasenaController,
+                    obscureText: true,
+                    decoration: const InputDecoration(labelText: "Contraseña"),
+                  ),
+                  TextField(
+                    controller: _confirmarContrasenaController,
+                    obscureText: true,
+                    decoration:
+                        const InputDecoration(labelText: "Confirmar Contraseña"),
+                  ),
+                  TextField(
+                    controller: _dniController,
+                    decoration: const InputDecoration(labelText: "DNI o NIE"),
+                  ),
+                  TextField(
+                    controller: _telefonoController,
+                    keyboardType: TextInputType.phone,
+                    decoration: const InputDecoration(labelText: "Teléfono"),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_textoLPD != null && _textoLPD!.isNotEmpty) ...[
+                    Text(
+                      _textoLPD!,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
                     ),
-                    const Expanded(
-                      child: Text(
-                        "He leído y acepto la política de notificaciones.",
-                        style: TextStyle(fontSize: 12),
-                      ),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _aceptaLPD,
+                          onChanged: (val) {
+                            setState(() {
+                              _aceptaLPD = val ?? false;
+                            });
+                          },
+                        ),
+                        const Expanded(
+                          child: Text(
+                            "He leído y acepto la política de notificaciones.",
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _loading ? null : _iniciarSesion,
-                child: _loading
-                    ? const CircularProgressIndicator()
-                    : const Text("Iniciar Sesión"),
+                  const SizedBox(height: 10),
+                  ElevatedButton(
+                    onPressed: _loading ? null : _iniciarSesion,
+                    child: _loading
+                        ? const CircularProgressIndicator()
+                        : const Text("Iniciar Sesión"),
+                  ),
+                  if (_error != null) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
+                  ]
+                ],
               ),
-              if (_error != null) ...[
-                const SizedBox(height: 20),
-                Text(
-                  _error!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ]
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
