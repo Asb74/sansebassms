@@ -15,6 +15,23 @@ workflows:
         script: |
           chmod +x setup-signing.sh
           ./setup-signing.sh
+      - name: Recreate GoogleService-Info.plist
+        script: |
+          # Recrear GoogleService-Info.plist desde la variable de entorno
+          python3 - <<'PY'
+          import os, base64, pathlib, sys
+          b64 = os.environ.get("GOOGLE_SERVICE_INFO_PLIST_B64", "")
+          if not b64:
+              print("ERROR: Falta la variable GOOGLE_SERVICE_INFO_PLIST_B64", file=sys.stderr)
+              sys.exit(1)
+          path = pathlib.Path("ios/Runner/GoogleService-Info.plist")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_bytes(base64.b64decode(b64))
+          print(f"Wrote {path} ({path.stat().st_size} bytes)")
+          PY
+
+          # Validar que el plist exista
+          test -f ios/Runner/GoogleService-Info.plist || { echo "Plist no encontrado"; exit 1; }
       - name: Build IPA
         script: |
           chmod +x build-ipa.sh
