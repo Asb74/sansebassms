@@ -30,6 +30,8 @@ log "Guardando archivo en $PLIST_PATH"
 mkdir -p "$(dirname "$PLIST_PATH")"
 mv "$tmpfile" "$PLIST_PATH"
 log "Archivo guardado en $PLIST_PATH"
+chmod 644 "$PLIST_PATH"
+log "Permisos ajustados para $PLIST_PATH"
 
 log "Fin del script de generación de GoogleService-Info.plist"
 
