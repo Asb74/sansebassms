@@ -16,6 +16,11 @@ workflows:
       - name: Post-build
         script: ./post-build.sh
 
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/ipa/*.dSYM.zip
+      - build/ios/ipa/*.app.dSYM.zip
+
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY      # contenido del archivo .p8
