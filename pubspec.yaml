@@ -38,6 +38,9 @@ flutter:
   assets:
     - assets/icono_app.png
 
+ios:
+  deployment_target: 15.0
+
 flutter_launcher_icons:
   android: true
   ios: true
