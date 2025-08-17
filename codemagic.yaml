@@ -38,6 +38,7 @@ workflows:
       - build/ios/archive/*.xcarchive
       - build.log
       - build.log.zip
+      - prebuild_plist.log
 
     publishing:
       app_store_connect:

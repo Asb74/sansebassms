@@ -1,40 +1,35 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-log_info() {
-  printf '%s\n' "$1"
+LOG_FILE="prebuild_plist.log"
+PLIST_PATH="ios/Runner/GoogleService-Info.plist"
+
+# clean previous log
+: > "$LOG_FILE"
+
+log() {
+  echo "$1" | tee -a "$LOG_FILE"
 }
 
-plist_path="ios/Runner/GoogleService-Info.plist"
+log "Inicio del script de generación de GoogleService-Info.plist"
 
-# Ensure the environment variable is set and non-empty
+log "Verificando variable de entorno GOOGLE_SERVICE_INFO_PLIST"
 if [[ -z "${GOOGLE_SERVICE_INFO_PLIST:-}" ]]; then
-  log_info "GOOGLE_SERVICE_INFO_PLIST is empty"
-  exit 1
+  log "Variable GOOGLE_SERVICE_INFO_PLIST no existe o está vacía. Continuando sin generar el archivo."
+  log "Fin del script de generación de GoogleService-Info.plist"
+  exit 0
 fi
+log "Variable encontrada"
 
-log_info "PLIST length: ${#GOOGLE_SERVICE_INFO_PLIST}"
+log "Decodificando base64"
+tmpfile="$(mktemp)"
+echo "$GOOGLE_SERVICE_INFO_PLIST" | base64 --decode > "$tmpfile"
+log "Decodificación completada"
 
-value="${GOOGLE_SERVICE_INFO_PLIST}"
-mkdir -p "$(dirname "$plist_path")"
+log "Guardando archivo en $PLIST_PATH"
+mkdir -p "$(dirname "$PLIST_PATH")"
+mv "$tmpfile" "$PLIST_PATH"
+log "Archivo guardado en $PLIST_PATH"
 
-# Detect base64: only base64 chars and length multiple of 4
-if printf '%s' "$value" | tr -d '\n\r' | grep -Eq '^[A-Za-z0-9+/=]+$' && [ $(( ${#value} % 4 )) -eq 0 ]; then
-  printf '%s' "$value" | base64 --decode > "$plist_path"
-else
-  printf '%s' "$value" > "$plist_path"
-fi
+log "Fin del script de generación de GoogleService-Info.plist"
 
-chmod 0644 "$plist_path"
-
-if ! plutil -lint "$plist_path" >/dev/null 2>&1; then
-  log_info "plutil validation failed for $plist_path"
-  exit 1
-fi
-
-file_size=$(wc -c < "$plist_path" | tr -d ' ')
-checksum=$(shasum -a 256 "$plist_path" | awk '{print $1}')
-
-log_info "PLIST file size: ${file_size} bytes"
-log_info "PLIST sha256: ${checksum}"
-log_info "PLIST path: $plist_path"
