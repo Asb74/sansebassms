@@ -1,33 +1,51 @@
-# Codemagic workflow configuration for iOS release builds
 workflows:
-  ios_release:
-    name: iOS Release (Xcode 16.2)
+  ios-release:
+    name: iOS Release
     environment:
-      xcode: 16.2
-      flutter: stable
-      vars:
-        BUNDLE_ID: com.example.sansebassms
-        APPLE_TEAM_ID: 7QWJ8R3ZB5
       groups:
-        - app_store_connect
+        - app_store_connect   # incluye la variable GOOGLE_SERVICE_INFO_PLIST_B64
+      xcode: latest
+      cocoapods: default
     scripts:
-      - name: Setup signing
+      - name: Prepare GoogleService-Info.plist
         script: |
-          chmod +x setup-signing.sh
-          ./setup-signing.sh
-      - name: Build IPA
+          set -euo pipefail
+          PLIST_PATH="ios/Runner/GoogleService-Info.plist"
+
+          if [[ -n "${GOOGLE_SERVICE_INFO_PLIST_B64:-}" ]]; then
+            echo "Writing GoogleService-Info.plist from env var..."
+            mkdir -p ios/Runner
+            echo "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > "$PLIST_PATH"
+            ls -l "$PLIST_PATH"
+          fi
+
+          if [[ ! -f "$PLIST_PATH" ]]; then
+            echo "⚠️ $PLIST_PATH not found. Running WITHOUT Firebase."
+            NEW_DEFINE=$(printf 'NO_FIREBASE=true' | base64)
+            if [[ -n "${DART_DEFINES:-}" ]]; then
+              export DART_DEFINES="${DART_DEFINES},${NEW_DEFINE}"
+            else
+              export DART_DEFINES="${NEW_DEFINE}"
+            fi
+          else
+            echo "✅ Found $PLIST_PATH (Firebase ON)"
+          fi
+
+      - name: Flutter build IPA
         script: |
-          chmod +x build-ipa.sh
-          ./build-ipa.sh
-    artifacts:
-      - build/ios/ipa/*.ipa
-      - codemagic_prebuild.log
-      - codemagic_setup_signing.log
-      - codemagic_build_ipa.log
-      - artifacts/*
+          # Ajustar target para que corra en iOS 15+
+          if grep -q "platform :ios" ios/Podfile; then
+            sed -i.bak "s/platform :ios, '.*'/platform :ios, '15.0'/" ios/Podfile || true
+          else
+            echo "platform :ios, '15.0'" >> ios/Podfile
+          fi
+          flutter pub get
+          flutter build ipa --release --build-number=3
+
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
-        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        api_key: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
+        key: $APP_STORE_CONNECT_PRIVATE_KEY
         submit_to_testflight: true
+
