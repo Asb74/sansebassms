@@ -5,40 +5,54 @@ workflows:
         - app_store_connect
       xcode: latest
     scripts:
-      - name: Generar GoogleService-Info.plist (seguro)
+      - name: Generar GoogleService-Info.plist
         script: |
           set -euo pipefail
-          bash tool/prebuild_plist.sh
+          echo "=== INICIO: GoogleService-Info.plist ===" | tee prebuild_plist.log
+          PLIST_PATH="ios/Runner/GoogleService-Info.plist"
+          mkdir -p ios/Runner
+          VAR="${GOOGLE_SERVICE_INFO_PLIST:-}"
 
-      - name: Instalar dependencias y CocoaPods
-        script: |
-          set -euo pipefail
-          echo "== POD INSTALL ==" | tee -a build.log
-          flutter pub get 2>&1 | tee -a build.log
-          cd ios
-          pod install --repo-update 2>&1 | tee -a ../build.log
-          cd ..
+          if [[ -z "${VAR}" ]]; then
+            echo "GOOGLE_SERVICE_INFO_PLIST vacío" | tee -a prebuild_plist.log
+            exit 1
+          fi
 
-      - name: Compilar IPA release
+          if echo "${VAR}" | head -n1 | grep -q '^<?xml'; then
+            echo "Detectado XML directo" | tee -a prebuild_plist.log
+            printf "%s" "${VAR}" > "${PLIST_PATH}"
+          else
+            echo "Decodificando base64" | tee -a prebuild_plist.log
+            printf "%s" "${VAR}" | base64 --decode > "${PLIST_PATH}"
+          fi
+
+          ls -l "${PLIST_PATH}" | tee -a prebuild_plist.log
+          head -n 6 "${PLIST_PATH}" | tee -a prebuild_plist.log
+
+      - name: Flutter build IPA
         script: |
           set -euo pipefail
-          echo "== FLUTTER BUILD ==" | tee -a build.log
-          flutter clean 2>&1 | tee -a build.log
-          flutter pub get 2>&1 | tee -a build.log
-          # Runner.xcworkspace is used automatically; Codemagic signs on export/publish
-          flutter build ipa --release --no-codesign --build-number=${BUILD_NUMBER:-1} 2>&1 | tee -a build.log
+          echo "== FLUTTER BUILD ==" | tee build.log
+          flutter pub get | tee -a build.log
+          if grep -q "platform :ios" ios/Podfile; then
+            sed -i.bak "s/platform :ios, '.*'/platform :ios, '15.0'/" ios/Podfile || true
+          else
+            echo "platform :ios, '15.0'" >> ios/Podfile
+          fi
+          flutter build ipa --release --build-number=$CM_BUILD_ID | tee -a build.log
+          ls -R build/ios/ipa | tee -a build.log
 
       - name: Empaquetar logs
         script: |
           set -e
-          zip -r build.log.zip build || true
+          zip -r logs.zip *.log || true
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/archive/*.xcarchive
-      - build.log
-      - build.log.zip
       - prebuild_plist.log
+      - build.log
+      - ios/Runner/GoogleService-Info.plist
+      - logs.zip
 
     publishing:
       app_store_connect:
