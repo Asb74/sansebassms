@@ -29,3 +29,7 @@ to provide the `GoogleService-Info.plist` contents during build time.
   ```
 
 - Paste the variable content **without quotes** and **without extra spaces**.
+
+## CI
+
+El build usa `--no-codesign`; Codemagic firma en Publish.
