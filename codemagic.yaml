@@ -44,8 +44,8 @@ workflows:
 
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_KEY_IDENTIFIER
-        issuer_id: $APP_STORE_CONNECT_ISSUER_ID
-        key: $APP_STORE_CONNECT_PRIVATE_KEY
+        api_key: $APP_STORE_CONNECT_PRIVATE_KEY      # contenido del archivo .p8
+        key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER    # Key ID (ej: 43Z3JZ75L6)
+        issuer_id: $APP_STORE_CONNECT_ISSUER_ID      # Issuer ID (UUID)
         submit_to_testflight: true
 
