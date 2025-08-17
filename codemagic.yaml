@@ -13,23 +13,31 @@ workflows:
       - name: Instalar dependencias y CocoaPods
         script: |
           set -euo pipefail
-          mkdir -p build_logs
-          echo "== POD INSTALL ==" | tee -a build_logs/build.log
-          flutter pub get 2>&1 | tee -a build_logs/build.log
+          echo "== POD INSTALL ==" | tee -a build.log
+          flutter pub get 2>&1 | tee -a build.log
           cd ios
-          pod install 2>&1 | tee -a ../build_logs/build.log
+          pod install --repo-update 2>&1 | tee -a ../build.log
           cd ..
 
       - name: Compilar IPA release
         script: |
           set -euo pipefail
-          mkdir -p build_logs
-          echo "== FLUTTER BUILD ==" | tee -a build_logs/build.log
-          flutter build ipa --release --build-number=$BUILD_NUMBER 2>&1 | tee -a build_logs/build.log
+          echo "== FLUTTER BUILD ==" | tee -a build.log
+          flutter clean 2>&1 | tee -a build.log
+          flutter pub get 2>&1 | tee -a build.log
+          # Runner.xcworkspace is used automatically; Codemagic signs on export/publish
+          flutter build ipa --release --no-codesign --build-number=${BUILD_NUMBER:-1} 2>&1 | tee -a build.log
+
+      - name: Empaquetar logs
+        script: |
+          set -e
+          zip -r build.log.zip build || true
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build_logs/**
+      - build/ios/archive/*.xcarchive
+      - build.log
+      - build.log.zip
 
     publishing:
       app_store_connect:
