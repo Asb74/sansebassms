@@ -32,6 +32,34 @@ workflows:
 
           # Validar que el plist exista
           test -f ios/Runner/GoogleService-Info.plist || { echo "Plist no encontrado"; exit 1; }
+      - name: Copy GoogleService-Info.plist into app
+        script: |
+          # === Crear GoogleService-Info.plist desde variable Base64 ===
+          python3 - <<'PY'
+          import os, base64, pathlib, sys
+          b64 = os.environ.get("GOOGLE_SERVICE_INFO_PLIST_B64", "")
+          if not b64:
+              print("ERROR: Falta la variable GOOGLE_SERVICE_INFO_PLIST_B64", file=sys.stderr)
+              sys.exit(1)
+          path = pathlib.Path("ios/Runner/GoogleService-Info.plist")
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_bytes(base64.b64decode(b64))
+          print(f"✅ Escrito {path} ({path.stat().st_size} bytes)")
+          PY
+
+          # Verificar que el plist existe
+          test -f ios/Runner/GoogleService-Info.plist || { echo "❌ Plist no creado"; exit 1; }
+
+          # === Copiarlo dentro del .app resultante ===
+          APP_PATH=$(find build/ -type d -name "*.xcarchive" -print -quit)/Products/Applications
+          DEST_APP=$(find "$APP_PATH" -maxdepth 1 -type d -name "*.app" -print -quit)
+
+          if [ -n "$DEST_APP" ] && [ -f ios/Runner/GoogleService-Info.plist ]; then
+            cp ios/Runner/GoogleService-Info.plist "$DEST_APP/GoogleService-Info.plist"
+            echo "✅ Copiado en bundle: $DEST_APP/GoogleService-Info.plist"
+          else
+            echo "⚠️ No se pudo copiar el plist al .app (quizá aún no está construido)"
+          fi
       - name: Build IPA
         script: |
           chmod +x build-ipa.sh
