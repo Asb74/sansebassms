@@ -3,92 +3,71 @@ workflows:
     name: iOS Release
     environment:
       groups:
-        - app_store_connect      # contiene GOOGLE_SERVICE_INFO_PLIST_B64 y claves ASC
+        - app_store_connect       # contiene GOOGLE_SERVICE_INFO_PLIST y claves ASC
       xcode: latest
       cocoapods: default
 
     scripts:
-      - name: Prepare logs dir
+      - name: Generar GoogleService-Info.plist
         script: |
-          set -euo pipefail
-          mkdir -p build_logs
-
-      - name: Prepare GoogleService-Info.plist (strict, logged)
-        script: |
-          set -euo pipefail
+          set -euxo pipefail
+          echo "=== INICIO: GoogleService-Info.plist ==="
           PLIST_PATH="ios/Runner/GoogleService-Info.plist"
-          VAR="${GOOGLE_SERVICE_INFO_PLIST_B64:-}"
-          {
-            echo "== PRE-BUILD PLIST =="
-            echo "VAR length: ${#VAR}"
-            mkdir -p ios/Runner
-            if [[ -z "$VAR" ]]; then
-              echo "FATAL: GOOGLE_SERVICE_INFO_PLIST_B64 is empty"; exit 1
-            fi
-            # decode base64 (GNU/BSD) con normalización CRLF; si falla y parece XML, escribir crudo
-            if (printf '%s' "$VAR" | tr -d '\r' | base64 --decode > "$PLIST_PATH" 2>/dev/null) || \
-               (printf '%s' "$VAR" | tr -d '\r' | base64 -D         > "$PLIST_PATH" 2>/dev/null); then
-              echo "Decoded via base64"
-            else
-              if printf '%.5s' "$VAR" | grep -q '<?xml'; then
-                printf '%s' "$VAR" > "$PLIST_PATH"
-                echo "Wrote raw XML"
-              else
-                echo "FATAL: Not valid Base64 nor XML"; exit 1
-              fi
-            fi
-            [[ -f "$PLIST_PATH" ]] || { echo "FATAL: $PLIST_PATH not created"; exit 1; }
-            head -c 5 "$PLIST_PATH" | grep -q '<?xml' || { echo "FATAL: $PLIST_PATH not XML"; exit 1; }
-            echo "OK -> $PLIST_PATH"
-            ls -l "$PLIST_PATH"
-            echo "First lines:"
-            head -n 8 "$PLIST_PATH"
-          } 2>&1 | tee build_logs/01_prebuild_plist.log
+          mkdir -p ios/Runner
+          VAR="${GOOGLE_SERVICE_INFO_PLIST:-}"
+          if [[ -z "$VAR" ]]; then
+            echo "GOOGLE_SERVICE_INFO_PLIST vacío"; exit 1
+          fi
+          if (printf '%s' "$VAR" | tr -d '\r' | base64 --decode > "$PLIST_PATH" 2>/dev/null) || \
+             (printf '%s' "$VAR" | tr -d '\r' | base64 -D        > "$PLIST_PATH" 2>/dev/null); then
+            echo "Decodificado Base64 a $PLIST_PATH"
+          else
+            echo "No se pudo decodificar GOOGLE_SERVICE_INFO_PLIST"; exit 1
+          fi
+          ls -l "$PLIST_PATH"
+          head -n 20 "$PLIST_PATH"
+          echo "=== FIN: GoogleService-Info.plist ==="
 
-      - name: CocoaPods & Workspace (logged)
+      - name: Configurar firma automática
         script: |
-          {
-            set -euo pipefail
-            echo "== PODS =="
-            if grep -q "platform :ios" ios/Podfile; then
-              sed -i.bak "s/platform :ios, '.*/platform :ios, '15.0'/" ios/Podfile || true
-            else
-              echo "platform :ios, '15.0'" >> ios/Podfile
-            fi
-            cd ios
-            pod repo update
-            pod install
-            cd ..
-            test -f ios/Runner.xcworkspace/contents.xcworkspacedata && echo "Workspace OK"
-          } 2>&1 | tee build_logs/02_pods_workspace.log
+          set -euxo pipefail
+          echo "=== INICIO: setup-signing ==="
+          ./setup-signing.sh
+          echo "=== FIN: setup-signing ==="
 
-      - name: Flutter build IPA (logged)
+      - name: Instalar dependencias y CocoaPods
         script: |
-          {
-            set -euo pipefail
-            echo "== FLUTTER BUILD =="
-            flutter pub get
-            flutter build ipa --release --build-number=${BUILD_NUMBER:-7}
-          } 2>&1 | tee build_logs/03_flutter_build.log
+          set -euxo pipefail
+          echo "=== INICIO: deps & pods ==="
+          flutter clean
+          flutter pub get
+          if grep -q "platform :ios" ios/Podfile; then
+            sed -i.bak "s/platform :ios, '.*/platform :ios, '15.0'/" ios/Podfile || true
+          else
+            echo "platform :ios, '15.0'" >> ios/Podfile
+          fi
+          cd ios
+          pod repo update
+          pod install
+          cd ..
+          test -f ios/Runner.xcworkspace/contents.xcworkspacedata
+          echo "=== FIN: deps & pods ==="
 
-      - name: Verify plist inside IPA (logged)
+      - name: Compilar IPA release
         script: |
-          {
-            set -euo pipefail
-            echo "== VERIFY IPA CONTENTS =="
-            IPA_PATH=$(ls build/ios/ipa/*.ipa | head -n1)
-            echo "IPA: $IPA_PATH"
-            unzip -l "$IPA_PATH" | tee build_logs/04_ipa_listing.txt
-            unzip -l "$IPA_PATH" | grep -q "GoogleService-Info.plist" \\
-              && echo "FOUND GoogleService-Info.plist in IPA" \\
-              || { echo "FATAL: GoogleService-Info.plist missing INSIDE IPA"; exit 1; }
-          } 2>&1 | tee -a build_logs/04_verify_ipa.log
+          set -euxo pipefail
+          echo "=== INICIO: flutter build ipa ==="
+          xcode-project use-profiles
+          flutter build ipa --release
+          echo "=== FIN: flutter build ipa ==="
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/ipa/*.dSYM.zip
-      - build/ios/ipa/*.app.dSYM.zip
-      - build_logs/**
+      - ios/Podfile.lock
+      - ios/Runner.xcworkspace/**
+      - flutter_*.log
+      - **/xcpretty*.log
+      - **/*.xcresult
 
     publishing:
       app_store_connect:
