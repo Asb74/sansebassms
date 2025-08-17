@@ -8,8 +8,8 @@ workflows:
       - name: Generar GoogleService-Info.plist
         script: |
           set -euo pipefail
-          echo "=== INICIO: GoogleService-Info.plist ===" | tee -a build_logs/prebuild.log
           mkdir -p build_logs
+          echo "=== INICIO: GoogleService-Info.plist ===" | tee -a build_logs/prebuild.log
           mkdir -p ios/Runner
           VAR="${GOOGLE_SERVICE_INFO_PLIST:-}"
           if [[ -z "${VAR}" ]]; then
