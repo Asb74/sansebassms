@@ -11,5 +11,6 @@ xcode-project use-profiles
 flutter build ipa --release --export-options-plist /Users/builder/export_options.plist
 
 mkdir -p artifacts
+cp build/ios/ipa/*.ipa artifacts/ || true
 cp "$LOG_FILE" artifacts/ || true
 echo "Build IPA DONE"
