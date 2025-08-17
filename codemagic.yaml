@@ -1,78 +1,55 @@
 workflows:
   ios-release:
-    name: iOS Release
     environment:
       groups:
-        - app_store_connect       # contiene GOOGLE_SERVICE_INFO_PLIST y claves ASC
+        - app_store_connect
       xcode: latest
-      cocoapods: default
-
     scripts:
       - name: Generar GoogleService-Info.plist
         script: |
-          set -euxo pipefail
-          echo "=== INICIO: GoogleService-Info.plist ==="
-          PLIST_PATH="ios/Runner/GoogleService-Info.plist"
+          set -euo pipefail
+          echo "=== INICIO: GoogleService-Info.plist ===" | tee -a build_logs/prebuild.log
+          mkdir -p build_logs
           mkdir -p ios/Runner
           VAR="${GOOGLE_SERVICE_INFO_PLIST:-}"
-          if [[ -z "$VAR" ]]; then
-            echo "GOOGLE_SERVICE_INFO_PLIST vacío"; exit 1
+          if [[ -z "${VAR}" ]]; then
+            echo "GOOGLE_SERVICE_INFO_PLIST vacío" | tee -a build_logs/prebuild.log
+            exit 1
           fi
-          if (printf '%s' "$VAR" | tr -d '\r' | base64 --decode > "$PLIST_PATH" 2>/dev/null) || \
-             (printf '%s' "$VAR" | tr -d '\r' | base64 -D        > "$PLIST_PATH" 2>/dev/null); then
-            echo "Decodificado Base64 a $PLIST_PATH"
+          if [[ "${VAR}" =~ ^\<\?xml ]]; then
+            echo "${VAR}" > ios/Runner/GoogleService-Info.plist
+            echo "Es XML en claro" | tee -a build_logs/prebuild.log
           else
-            echo "No se pudo decodificar GOOGLE_SERVICE_INFO_PLIST"; exit 1
+            echo "${VAR}" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "Decodificado desde base64" | tee -a build_logs/prebuild.log
           fi
-          ls -l "$PLIST_PATH"
-          head -n 20 "$PLIST_PATH"
-          echo "=== FIN: GoogleService-Info.plist ==="
-
-      - name: Configurar firma automática
-        script: |
-          set -euxo pipefail
-          echo "=== INICIO: setup-signing ==="
-          ./setup-signing.sh
-          echo "=== FIN: setup-signing ==="
+          ls -l ios/Runner/GoogleService-Info.plist | tee -a build_logs/prebuild.log
+          head -n 6 ios/Runner/GoogleService-Info.plist | tee -a build_logs/prebuild.log
 
       - name: Instalar dependencias y CocoaPods
         script: |
-          set -euxo pipefail
-          echo "=== INICIO: deps & pods ==="
-          flutter clean
-          flutter pub get
-          if grep -q "platform :ios" ios/Podfile; then
-            sed -i.bak "s/platform :ios, '.*/platform :ios, '15.0'/" ios/Podfile || true
-          else
-            echo "platform :ios, '15.0'" >> ios/Podfile
-          fi
+          set -euo pipefail
+          mkdir -p build_logs
+          echo "== POD INSTALL ==" | tee -a build_logs/build.log
+          flutter pub get 2>&1 | tee -a build_logs/build.log
           cd ios
-          pod repo update
-          pod install
+          pod install 2>&1 | tee -a ../build_logs/build.log
           cd ..
-          test -f ios/Runner.xcworkspace/contents.xcworkspacedata
-          echo "=== FIN: deps & pods ==="
 
       - name: Compilar IPA release
         script: |
-          set -euxo pipefail
-          echo "=== INICIO: flutter build ipa ==="
-          xcode-project use-profiles
-          flutter build ipa --release
-          echo "=== FIN: flutter build ipa ==="
+          set -euo pipefail
+          mkdir -p build_logs
+          echo "== FLUTTER BUILD ==" | tee -a build_logs/build.log
+          flutter build ipa --release --build-number=$BUILD_NUMBER 2>&1 | tee -a build_logs/build.log
 
     artifacts:
       - build/ios/ipa/*.ipa
-      - ios/Podfile.lock
-      - ios/Runner.xcworkspace/**
-      - "flutter_*.log"
-      - "**/xcpretty*.log"
-      - "**/*.xcresult"
+      - build_logs/**
 
     publishing:
       app_store_connect:
-        api_key: $APP_STORE_CONNECT_PRIVATE_KEY
+        api_key: $APP_STORE_CONNECT_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER
         issuer_id: $APP_STORE_CONNECT_ISSUER_ID
         submit_to_testflight: true
-
