@@ -8,6 +8,8 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:provider/provider.dart';
 
 import 'data/app_database.dart';
 
@@ -17,6 +19,9 @@ import 'screens/splash_screen.dart';
 import 'screens/usuario_screen.dart';
 import 'debug/log_buffer.dart';
 import 'debug/log_console.dart';
+import 'app_state.dart';
+import 'services/logger.dart';
+import 'widgets/error_banner.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -29,33 +34,64 @@ const bool kShowLogButton =
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   installGlobalLogCapture();
-
-  FlutterError.onError = (details) {
-    FlutterError.dumpErrorToConsole(details);
-    LogBuffer.I.add('FlutterError: ${details.exceptionAsString()}');
-  };
+  final logger = LoggingService.instance;
+  final appState = AppState();
 
   runZonedGuarded(() async {
-    print('MAIN: start');
-    if (!runningWithoutFirebase) {
+    FlutterError.onError = (details) {
+      logger.error('FlutterError', details.exception, details.stack);
       try {
-        await Firebase.initializeApp();
-        print('MAIN: Firebase initialized');
-      } catch (e, st) {
-        print('MAIN: Firebase FAILED: $e\n$st');
-      }
-    } else {
-      print('Running without Firebase (NO_FIREBASE=true)');
-    }
+        FirebaseCrashlytics.instance.recordFlutterError(details);
+      } catch (_) {}
+    };
+
+    await _initFirebase(appState, logger);
     await _initNotifications();
     await Hive.initFlutter();
-    runApp(FirstFrameGate(child: const MyApp()));
+
+    runApp(
+      ChangeNotifierProvider.value(
+        value: appState,
+        child: FirstFrameGate(child: const MyApp()),
+      ),
+    );
   }, (error, stack) {
-    print('ZonedError: $error\n$stack');
+    logger.error('Uncaught zone error', error, stack);
+    try {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    } catch (_) {}
   }, zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
     LogBuffer.I.add(line);
     parent.print(zone, line);
   }));
+}
+
+Future<void> _initFirebase(AppState state, LoggingService logger) async {
+  if (runningWithoutFirebase) {
+    logger.info('Running without Firebase (NO_FIREBASE=true)');
+    return;
+  }
+  try {
+    final init = Firebase.initializeApp();
+    await init.timeout(const Duration(seconds: 10));
+    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
+    state.setFirebaseAvailable(true);
+    logger.info('Firebase initialized');
+  } catch (e, st) {
+    state.setFirebaseAvailable(false, error: e.toString());
+    logger.error('Firebase init failed', e, st);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = navigatorKey.currentContext;
+      if (ctx != null) {
+        ErrorBanner.show(ctx,
+            message: 'Firebase no disponible',
+            details: e.toString(),
+            error: e,
+            stackTrace: st,
+            onRetry: () => _initFirebase(state, logger));
+      }
+    });
+  }
 }
 
 Future<void> _initNotifications() async {

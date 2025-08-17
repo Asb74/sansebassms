@@ -6,6 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'home_screen.dart';
 import 'screens/usuario_screen.dart';
 import 'data/bootstrap_repo.dart';
+import 'widgets/error_banner.dart';
+import 'services/logger.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -25,6 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   String? _textoLPD;
   bool _aceptaLPD = false;
+  String? _lpdError;
 
   @override
   void initState() {
@@ -37,16 +40,30 @@ class _LoginScreenState extends State<LoginScreen> {
       final doc = await FirebaseFirestore.instance
           .collection("LPD")
           .doc("Login")
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 8));
 
       if (doc.exists) {
         setState(() {
           _textoLPD = doc.data()?["Autorizacion"] ?? "";
         });
+        return;
       }
-    } catch (_) {
-      // Si falla la carga, dejamos el texto como null
+    } catch (e, st) {
+      LoggingService.instance
+          .error('Error cargando consentimiento', e, st);
+      if (mounted) {
+        ErrorBanner.show(context,
+            message: 'Firebase no disponible (timeout)',
+            details: e.toString(),
+            error: e,
+            stackTrace: st,
+            onRetry: _cargarTextoLPD);
+      }
     }
+    setState(() {
+      _textoLPD = null;
+    });
   }
 
   bool esDniValido(String dni) {
@@ -73,6 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _lpdError = null;
     });
 
     final correo = _correoController.text.trim();
@@ -110,10 +128,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!_aceptaLPD) {
       setState(() {
-        _error = "☑️ Debes aceptar la política de notificaciones para continuar.";
+        _lpdError =
+            "☑️ Debes aceptar la política de notificaciones para continuar.";
         _loading = false;
       });
       return;
+    } else {
+      _lpdError = null;
     }
 
     try {
@@ -223,8 +244,37 @@ class _LoginScreenState extends State<LoginScreen> {
           _error = "✅ Cuenta registrada. Espera la autorización del administrador.";
         });
       }
-    } catch (e) {
-      setState(() => _error = "❌ Error: ${e.toString()}");
+    } on FirebaseAuthException catch (e, st) {
+      LoggingService.instance.error('Error de FirebaseAuth', e, st);
+      String msg;
+      switch (e.code) {
+        case 'invalid-credential':
+          msg = 'Credenciales inválidas';
+          break;
+        case 'network-request-failed':
+          msg = 'Fallo de red';
+          break;
+        default:
+          msg = e.message ?? 'Error de autenticación';
+      }
+      if (mounted) {
+        ErrorBanner.show(context,
+            message: msg,
+            details: e.code,
+            error: e,
+            stackTrace: st,
+            onRetry: _iniciarSesion);
+      }
+    } catch (e, st) {
+      LoggingService.instance.error('Error inesperado al iniciar sesión', e, st);
+      if (mounted) {
+        ErrorBanner.show(context,
+            message: 'Error inesperado',
+            details: e.toString(),
+            error: e,
+            stackTrace: st,
+            onRetry: _iniciarSesion);
+      }
     }
 
     setState(() => _loading = false);
@@ -296,7 +346,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ],
                     ),
-                  ],
+                    if (_lpdError != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 8.0),
+                        child: Text(
+                          _lpdError!,
+                          style:
+                              const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                  ] else
+                    const Text(
+                      'No se pudo cargar el texto de consentimiento',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                      textAlign: TextAlign.center,
+                    ),
                   const SizedBox(height: 10),
                   ElevatedButton(
                     onPressed: _loading ? null : _iniciarSesion,
