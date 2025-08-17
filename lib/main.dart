@@ -18,6 +18,9 @@ import 'screens/usuario_screen.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+const bool runningWithoutFirebase =
+    bool.fromEnvironment('NO_FIREBASE', defaultValue: false);
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -26,7 +29,17 @@ Future<void> main() async {
   };
 
   runZonedGuarded(() async {
-    await Firebase.initializeApp();
+    if (!runningWithoutFirebase) {
+      try {
+        await Firebase.initializeApp();
+      } catch (e, st) {
+        // ignore: avoid_print
+        print('Firebase init failed: $e\n$st');
+      }
+    } else {
+      // ignore: avoid_print
+      print('Running without Firebase (NO_FIREBASE=true)');
+    }
     await _initNotifications();
     runApp(const _BootstrapGuard(child: SansebasSmsApp()));
   }, (error, stack) {
