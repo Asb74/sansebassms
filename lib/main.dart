@@ -1,255 +1,153 @@
-import 'dart:async';
+import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:provider/provider.dart';
 
-import 'data/app_database.dart';
-
-import 'login_screen.dart';
 import 'home_screen.dart';
-import 'screens/splash_screen.dart';
-import 'screens/usuario_screen.dart';
-import 'debug/log_buffer.dart';
-import 'debug/log_console.dart';
-import 'app_state.dart';
-import 'services/logger.dart';
-import 'widgets/error_banner.dart';
 
-final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+class AppLogger {
+  static File? _file;
 
-const bool runningWithoutFirebase =
-    bool.fromEnvironment('NO_FIREBASE', defaultValue: false);
-const bool kShowLogButton =
-    bool.fromEnvironment('SHOW_LOG', defaultValue: true);
+  static Future<File> _ensureFile() async {
+    if (_file != null) return _file!;
+    final dir = await getApplicationDocumentsDirectory();
+    _file = File('${dir.path}/app_logs.txt');
+    if (!(await _file!.exists())) {
+      await _file!.create(recursive: true);
+    }
+    return _file!;
+  }
+
+  static Future<void> log(String message, [Object? error, StackTrace? stack]) async {
+    final f = await _ensureFile();
+    final now = DateTime.now().toIso8601String();
+    final lines = [
+      '[$now] $message',
+      if (error != null) 'ERROR: $error',
+      if (stack != null) 'STACK: $stack',
+    ];
+    final txt = lines.join('\n') + '\n';
+    // consola
+    debugPrint(txt);
+    // archivo
+    await f.writeAsString(txt, mode: FileMode.append, flush: true);
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  installGlobalLogCapture();
-  final logger = LoggingService.instance;
-  final appState = AppState();
+  await AppLogger.log('App start: inicializando Firebase');
 
-  runZonedGuarded(() async {
-    FlutterError.onError = (details) {
-      logger.error('FlutterError', details.exception, details.stack);
-      try {
-        FirebaseCrashlytics.instance.recordFlutterError(details);
-      } catch (_) {}
-    };
+  FlutterError.onError = (FlutterErrorDetails details) async {
+    FlutterError.presentError(details);
+    await AppLogger.log('FlutterError', details.exception, details.stack);
+  };
 
-    await _initFirebase(appState, logger);
-    await _initNotifications();
-    await Hive.initFlutter();
+  PlatformDispatcher.instance.onError = (error, stack) {
+    AppLogger.log('Zoned error', error, stack);
+    return false;
+  };
 
-    runApp(
-      ChangeNotifierProvider.value(
-        value: appState,
-        child: FirstFrameGate(child: const MyApp()),
-      ),
-    );
-  }, (error, stack) {
-    logger.error('Uncaught zone error', error, stack);
-    try {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    } catch (_) {}
-  }, zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
-    LogBuffer.I.add(line);
-    parent.print(zone, line);
-  }));
-}
+  bool firebaseOK = false;
+  Object? initError;
+  StackTrace? initStack;
 
-Future<void> _initFirebase(AppState state, LoggingService logger) async {
-  if (runningWithoutFirebase) {
-    logger.info('Running without Firebase (NO_FIREBASE=true)');
-    return;
-  }
   try {
-    final init = Firebase.initializeApp();
-    await init.timeout(const Duration(seconds: 10));
-    await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(true);
-    state.setFirebaseAvailable(true);
-    logger.info('Firebase initialized');
-  } catch (e, st) {
-    state.setFirebaseAvailable(false, error: e.toString());
-    logger.error('Firebase init failed', e, st);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ctx = navigatorKey.currentContext;
-      if (ctx != null) {
-        ErrorBanner.show(ctx,
-            message: 'Firebase no disponible',
-            details: e.toString(),
-            error: e,
-            stackTrace: st,
-            onRetry: () => _initFirebase(state, logger));
-      }
-    });
+    await Firebase.initializeApp();
+    firebaseOK = true;
+    await AppLogger.log('Firebase inicializado OK');
+  } catch (e, s) {
+    firebaseOK = false;
+    initError = e;
+    initStack = s;
+    await AppLogger.log('Error al inicializar Firebase', e, s);
   }
-}
 
-Future<void> _initNotifications() async {
-  const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const iosSettings = DarwinInitializationSettings();
-  const initSettings = InitializationSettings(
-    android: androidSettings,
-    iOS: iosSettings,
-  );
-  try {
-    await flutterLocalNotificationsPlugin.initialize(
-      initSettings,
-      onDidReceiveNotificationResponse: (response) {
-        if (response.payload == "abrir_usuario_screen") {
-          navigatorKey.currentState?.pushNamed("/usuario");
-        }
-      },
-    );
-  } catch (e) {
-    // Avoid blocking app startup if notifications fail to initialize
-    debugPrint('Notification init failed: $e');
-  }
+  runApp(MyApp(firebaseOK: firebaseOK, initError: initError, initStack: initStack));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool firebaseOK;
+  final Object? initError;
+  final StackTrace? initStack;
 
-  Future<Widget> _decidirPantallaInicial() async {
-    final db = await AppDatabase.instance.database;
-    await db.rawQuery('SELECT 1');
-    debugPrint('DB warmup complete');
-
-    final prefs = await SharedPreferences.getInstance();
-    final correo = prefs.getString("correo");
-    final contrasena = prefs.getString("contrasena");
-    await Future.delayed(const Duration(milliseconds: 1500));
-
-    if (correo != null && contrasena != null) {
-      final query = await FirebaseFirestore.instance
-          .collection("UsuariosAutorizados")
-          .where("correo", isEqualTo: correo)
-          .get();
-
-      if (query.docs.isNotEmpty) {
-        final doc = query.docs.first;
-        final data = doc.data();
-        final rol = (data["Rol"] ?? "user").toString().toLowerCase();
-        final permitido = data["Valor"] == true;
-
-        if (!permitido) return const LoginScreen();
-
-        // ✅ Actualizar token FCM
-        try {
-          final user = FirebaseAuth.instance.currentUser;
-          final uid = user?.uid ?? doc.id;
-
-          final token = await FirebaseMessaging.instance.getToken();
-          if (token != null) {
-            await FirebaseFirestore.instance
-                .collection("UsuariosAutorizados")
-                .doc(uid)
-                .update({"fcmToken": token});
-          }
-
-          // 🔁 Escuchar cambios futuros del token
-          FirebaseMessaging.instance.onTokenRefresh.listen((nuevoToken) async {
-            await FirebaseFirestore.instance
-                .collection("UsuariosAutorizados")
-                .doc(uid)
-                .update({"fcmToken": nuevoToken});
-          });
-        } catch (e) {
-          print("⚠️ No se pudo actualizar el token FCM: $e");
-        }
-
-        if (rol == "admin") return const HomeScreen();
-        return const UsuarioScreen();
-      }
-    }
-
-    return const LoginScreen();
-  }
+  const MyApp({super.key, required this.firebaseOK, this.initError, this.initStack});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SansebasSms',
-      navigatorKey: navigatorKey,
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        useMaterial3: true,
-      ),
-      routes: {
-        '/usuario': (_) => const UsuarioScreen(),
-      },
-      home: Stack(
-        children: [
-          FutureBuilder<Widget>(
-            future: _decidirPantallaInicial(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SplashScreen();
-              return snapshot.data!;
-            },
-          ),
-          if (kShowLogButton)
-            Positioned(
-              right: 12,
-              bottom: 24,
-              child: ElevatedButton(
-                onPressed: () => Navigator.of(context)
-                    .push(MaterialPageRoute(builder: (_) => const LogConsole())),
-                child: const Text('Ver registro'),
-              ),
-            ),
-        ],
-      ),
-      debugShowCheckedModeBanner: false,
+      title: 'App',
+      home: firebaseOK ? const HomeScreen() : ErrorScreen(error: initError),
     );
   }
 }
 
-class FirstFrameGate extends StatefulWidget {
-  const FirstFrameGate({super.key, required this.child});
-  final Widget child;
+class ErrorScreen extends StatelessWidget {
+  final Object? error;
+  const ErrorScreen({super.key, this.error});
 
   @override
-  State<FirstFrameGate> createState() => _FirstFrameGateState();
+  Widget build(BuildContext context) {
+    final errText = (error ?? 'Error desconocido').toString();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Error inicializando Firebase')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(errText),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const LogsScreen()));
+              },
+              child: const Text('Ver logs'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
-class _FirstFrameGateState extends State<FirstFrameGate> {
-  bool _firstFrameSeen = false;
-  bool _timeout = false;
+class LogsScreen extends StatefulWidget {
+  const LogsScreen({super.key});
+  @override
+  State<LogsScreen> createState() => _LogsScreenState();
+}
+
+class _LogsScreenState extends State<LogsScreen> {
+  String _logs = 'Cargando...';
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _firstFrameSeen = true;
-    });
-    Timer(const Duration(seconds: 5), () {
-      if (!_firstFrameSeen && mounted) {
-        setState(() => _timeout = true);
-      }
-    });
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final f = File('${dir.path}/app_logs.txt');
+      final txt = await f.exists() ? await f.readAsString() : '(Sin logs)';
+      setState(() => _logs = txt);
+    } catch (e, s) {
+      await AppLogger.log('Error leyendo logs', e, s);
+      setState(() => _logs = 'Error leyendo logs: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_timeout && !_firstFrameSeen) {
-      return MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Text(
-                'Diagnóstico: no se pintó el primer frame.\nRevisa inicialización de DB y logs.'),
-          ),
-        ),
-      );
-    }
-    return widget.child;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Logs de la app')),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: SelectableText(_logs),
+      ),
+    );
   }
 }
