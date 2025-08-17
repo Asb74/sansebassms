@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +7,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+
+import 'data/app_database.dart';
 
 import 'login_screen.dart';
 import 'home_screen.dart';
@@ -14,11 +18,22 @@ import 'screens/usuario_screen.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  await _initNotifications();
-  runApp(const SansebasSmsApp());
+
+  FlutterError.onError = (details) {
+    FlutterError.dumpErrorToConsole(details);
+  };
+
+  runZonedGuarded(() async {
+    await Firebase.initializeApp();
+    await _initNotifications();
+    runApp(const _BootstrapGuard(child: SansebasSmsApp()));
+  }, (error, stack) {
+    // Última barrera de errores
+    // ignore: avoid_print
+    print('ZonedError: $error\n$stack');
+  });
 }
 
 Future<void> _initNotifications() async {
@@ -47,6 +62,10 @@ class SansebasSmsApp extends StatelessWidget {
   const SansebasSmsApp({super.key});
 
   Future<Widget> _decidirPantallaInicial() async {
+    final db = await AppDatabase.instance.database;
+    await db.rawQuery('SELECT 1');
+    debugPrint('DB warmup complete');
+
     final prefs = await SharedPreferences.getInstance();
     final correo = prefs.getString("correo");
     final contrasena = prefs.getString("contrasena");
@@ -119,5 +138,40 @@ class SansebasSmsApp extends StatelessWidget {
       ),
       debugShowCheckedModeBanner: false,
     );
+  }
+}
+
+class _BootstrapGuard extends StatefulWidget {
+  const _BootstrapGuard({super.key, required this.child});
+  final Widget child;
+
+  @override
+  State<_BootstrapGuard> createState() => _BootstrapGuardState();
+}
+
+class _BootstrapGuardState extends State<_BootstrapGuard> {
+  bool _timeout = false;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _timeout = true);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_timeout) {
+      return MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text(
+                'Diagnóstico: no se pintó el primer frame.\nRevisa inicialización de DB y logs.'),
+          ),
+        ),
+      );
+    }
+    return widget.child;
   }
 }
