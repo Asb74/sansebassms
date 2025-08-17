@@ -29,6 +29,35 @@ for var in APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_KEY_IDENTIFIER APP_STOR
   fi
 done
 
+PLIST_PATH="ios/Runner/GoogleService-Info.plist"
+if [[ -n "${GOOGLE_SERVICE_INFO_PLIST_B64:-}" ]]; then
+  echo "Processing GOOGLE_SERVICE_INFO_PLIST_B64..."
+  mkdir -p ios/Runner
+  if printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_B64" | base64 --decode > "$PLIST_PATH.tmp" 2>/dev/null; then
+    mv "$PLIST_PATH.tmp" "$PLIST_PATH"
+    echo "Decoded Base64 plist"
+  elif grep -q '<plist' <<<"$GOOGLE_SERVICE_INFO_PLIST_B64"; then
+    printf '%s' "$GOOGLE_SERVICE_INFO_PLIST_B64" > "$PLIST_PATH"
+    echo "Wrote raw XML plist"
+  else
+    echo "Invalid GOOGLE_SERVICE_INFO_PLIST_B64; Firebase will be disabled"
+    rm -f "$PLIST_PATH.tmp"
+  fi
+  ls -l "$PLIST_PATH" 2>/dev/null || true
+fi
+
+if [[ ! -f "$PLIST_PATH" ]]; then
+  echo "⚠️ $PLIST_PATH not found. Running WITHOUT Firebase."
+  NEW_DEFINE=$(printf 'NO_FIREBASE=true' | base64)
+  if [[ -n "${DART_DEFINES:-}" ]]; then
+    export DART_DEFINES="${DART_DEFINES},${NEW_DEFINE}"
+  else
+    export DART_DEFINES="${NEW_DEFINE}"
+  fi
+else
+  echo "✅ Found $PLIST_PATH (Firebase ON)"
+fi
+
 echo "Flutter: $(flutter --version 2>/dev/null || echo 'not installed')"
 echo "Ruby: $(ruby -v 2>/dev/null || echo 'not installed')"
 echo "CocoaPods: $(pod --version 2>/dev/null || echo 'not installed')"
