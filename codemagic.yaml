@@ -65,9 +65,9 @@ workflows:
       - build/ios/ipa/*.ipa
       - ios/Podfile.lock
       - ios/Runner.xcworkspace/**
-      - flutter_*.log
-      - **/xcpretty*.log
-      - **/*.xcresult
+      - "flutter_*.log"
+      - "**/xcpretty*.log"
+      - "**/*.xcresult"
 
     publishing:
       app_store_connect:
