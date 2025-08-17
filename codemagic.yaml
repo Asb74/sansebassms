@@ -26,7 +26,7 @@ workflows:
               echo "FATAL: GOOGLE_SERVICE_INFO_PLIST_B64 is empty"; exit 1
             fi
             # decode base64 (GNU/BSD) con normalización CRLF; si falla y parece XML, escribir crudo
-            if (printf '%s' "$VAR" | tr -d '\r' | base64 --decode > "$PLIST_PATH" 2>/dev/null) || \\
+            if (printf '%s' "$VAR" | tr -d '\r' | base64 --decode > "$PLIST_PATH" 2>/dev/null) || \
                (printf '%s' "$VAR" | tr -d '\r' | base64 -D         > "$PLIST_PATH" 2>/dev/null); then
               echo "Decoded via base64"
             else
