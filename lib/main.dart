@@ -15,40 +15,47 @@ import 'login_screen.dart';
 import 'home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/usuario_screen.dart';
+import 'debug/log_buffer.dart';
+import 'debug/log_console.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 const bool runningWithoutFirebase =
     bool.fromEnvironment('NO_FIREBASE', defaultValue: false);
+const bool kShowLogButton =
+    bool.fromEnvironment('SHOW_LOG', defaultValue: true);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installGlobalLogCapture();
 
   FlutterError.onError = (details) {
     FlutterError.dumpErrorToConsole(details);
+    LogBuffer.I.add('FlutterError: ${details.exceptionAsString()}');
   };
 
   runZonedGuarded(() async {
+    print('MAIN: start');
     if (!runningWithoutFirebase) {
       try {
         await Firebase.initializeApp();
+        print('MAIN: Firebase initialized');
       } catch (e, st) {
-        // ignore: avoid_print
-        print('Firebase init failed: $e\n$st');
+        print('MAIN: Firebase FAILED: $e\n$st');
       }
     } else {
-      // ignore: avoid_print
       print('Running without Firebase (NO_FIREBASE=true)');
     }
     await _initNotifications();
     await Hive.initFlutter();
     runApp(FirstFrameGate(child: const MyApp()));
   }, (error, stack) {
-    // Última barrera de errores
-    // ignore: avoid_print
     print('ZonedError: $error\n$stack');
-  });
+  }, zoneSpecification: ZoneSpecification(print: (self, parent, zone, line) {
+    LogBuffer.I.add(line);
+    parent.print(zone, line);
+  }));
 }
 
 Future<void> _initNotifications() async {
@@ -144,12 +151,26 @@ class MyApp extends StatelessWidget {
       routes: {
         '/usuario': (_) => const UsuarioScreen(),
       },
-      home: FutureBuilder<Widget>(
-        future: _decidirPantallaInicial(),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) return const SplashScreen();
-          return snapshot.data!;
-        },
+      home: Stack(
+        children: [
+          FutureBuilder<Widget>(
+            future: _decidirPantallaInicial(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const SplashScreen();
+              return snapshot.data!;
+            },
+          ),
+          if (kShowLogButton)
+            Positioned(
+              right: 12,
+              bottom: 24,
+              child: ElevatedButton(
+                onPressed: () => Navigator.of(context)
+                    .push(MaterialPageRoute(builder: (_) => const LogConsole())),
+                child: const Text('Ver registro'),
+              ),
+            ),
+        ],
       ),
       debugShowCheckedModeBanner: false,
     );
