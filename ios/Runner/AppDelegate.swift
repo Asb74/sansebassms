@@ -4,7 +4,7 @@ import Firebase
 import UserNotifications
 
 @UIApplicationMain
-@objc class AppDelegate: FlutterAppDelegate, UNUserNotificationCenterDelegate, MessagingDelegate {
+@objc class AppDelegate: FlutterAppDelegate, MessagingDelegate {
 
   override func application(
     _ application: UIApplication,
@@ -39,9 +39,9 @@ import UserNotifications
 
   // Mostrar notificaciones en foreground (iOS 10+)
   @available(iOS 10.0, *)
-  public func userNotificationCenter(_ center: UNUserNotificationCenter,
-                                     willPresent notification: UNNotification,
-                                     withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+  override func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                       willPresent notification: UNNotification,
+                                       withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
     completionHandler([.badge, .banner, .sound])
   }
 }
