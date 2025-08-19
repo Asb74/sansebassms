@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -70,22 +72,34 @@ class SansebasSmsApp extends StatelessWidget {
         try {
           final user = FirebaseAuth.instance.currentUser;
           final uid = user?.uid ?? doc.id;
+          final messaging = FirebaseMessaging.instance;
 
-          final token = await FirebaseMessaging.instance.getToken();
-          if (token != null) {
-            await FirebaseFirestore.instance
-                .collection("UsuariosAutorizados")
-                .doc(uid)
-                .update({"fcmToken": token});
+          final settings = await messaging.requestPermission();
+          if (settings.authorizationStatus != AuthorizationStatus.denied) {
+            if (Platform.isIOS) {
+              String? apnsToken = await messaging.getAPNSToken();
+              while (apnsToken == null) {
+                await Future.delayed(const Duration(milliseconds: 500));
+                apnsToken = await messaging.getAPNSToken();
+              }
+            }
+
+            final token = await messaging.getToken();
+            if (token != null) {
+              await FirebaseFirestore.instance
+                  .collection("UsuariosAutorizados")
+                  .doc(uid)
+                  .update({"fcmToken": token});
+            }
+
+            // 🔁 Escuchar cambios futuros del token
+            messaging.onTokenRefresh.listen((nuevoToken) async {
+              await FirebaseFirestore.instance
+                  .collection("UsuariosAutorizados")
+                  .doc(uid)
+                  .update({"fcmToken": nuevoToken});
+            });
           }
-
-          // 🔁 Escuchar cambios futuros del token
-          FirebaseMessaging.instance.onTokenRefresh.listen((nuevoToken) async {
-            await FirebaseFirestore.instance
-                .collection("UsuariosAutorizados")
-                .doc(uid)
-                .update({"fcmToken": nuevoToken});
-          });
         } catch (e) {
           print("⚠️ No se pudo actualizar el token FCM: $e");
         }

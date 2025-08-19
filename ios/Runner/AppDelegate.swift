@@ -16,10 +16,10 @@ import UserNotifications
     // Notificaciones iOS
     UNUserNotificationCenter.current().delegate = self
     UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in }
-    application.registerForRemoteNotifications()
+      application.registerForRemoteNotifications()
 
-    // FCM
-    Messaging.messaging().delegate = self
+      // FCM
+      Messaging.messaging().delegate = self
 
     GeneratedPluginRegistrant.register(with: self)
     return super.application(application, didFinishLaunchingWithOptions: launchOptions)
@@ -29,6 +29,7 @@ import UserNotifications
   override func application(_ application: UIApplication,
                             didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
     Messaging.messaging().apnsToken = deviceToken
+    // After APNs registration, it's safe to request the FCM token in Dart
     super.application(application, didRegisterForRemoteNotificationsWithDeviceToken: deviceToken)
   }
 
