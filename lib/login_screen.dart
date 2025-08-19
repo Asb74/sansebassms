@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -66,6 +68,28 @@ class _LoginScreenState extends State<LoginScreen> {
     final letraEsperada = letras[numeroSinLetra! % 23];
 
     return letraEsperada == numero[8];
+  }
+
+  Future<String?> _obtenerTokenFcm() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final settings = await messaging.requestPermission();
+      if (settings.authorizationStatus == AuthorizationStatus.denied) {
+        return null;
+      }
+
+      if (Platform.isIOS) {
+        String? apnsToken = await messaging.getAPNSToken();
+        while (apnsToken == null) {
+          await Future.delayed(const Duration(milliseconds: 500));
+          apnsToken = await messaging.getAPNSToken();
+        }
+      }
+
+      return await messaging.getToken();
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _iniciarSesion() async {
@@ -200,7 +224,15 @@ class _LoginScreenState extends State<LoginScreen> {
         );
 
         final uid = cred.user!.uid;
-        final fcmToken = await FirebaseMessaging.instance.getToken();
+        final fcmToken = await _obtenerTokenFcm();
+        if (fcmToken == null) {
+          setState(() {
+            _error =
+                "⚠️ No se pudo generar el token de notificación. Inténtalo más tarde.";
+            _loading = false;
+          });
+          return;
+        }
 
         await FirebaseFirestore.instance
             .collection("UsuariosAutorizados")
