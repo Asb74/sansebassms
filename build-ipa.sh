@@ -33,6 +33,40 @@ else
   echo "❌ GoogleService-Info.plist missing from IPA"
   exit 1
 fi
+
+# Extract provisioning profile and entitlements
+TMP_DIR=$(mktemp -d)
+unzip -q "$IPA_PATH" -d "$TMP_DIR"
+APP_DIR=$(find "$TMP_DIR/Payload" -maxdepth 1 -name "*.app" -print -quit)
+if [ -z "$APP_DIR" ]; then
+  echo "❌ .app bundle not found inside IPA"
+  exit 1
+fi
+
+# Save embedded.mobileprovision for inspection
+cp "$APP_DIR/embedded.mobileprovision" "$ROOT_DIR/embedded.mobileprovision"
+
+# Extract entitlements from the app
+ENTITLEMENTS_PLIST="$ROOT_DIR/app.entitlements.plist"
+codesign -d --entitlements :- "$APP_DIR" > "$ENTITLEMENTS_PLIST" 2>/dev/null
+plutil -convert xml1 -o "$ENTITLEMENTS_PLIST" "$ENTITLEMENTS_PLIST"
+
+# Check for push notification capabilities
+if grep -q "<key>aps-environment</key>" "$ENTITLEMENTS_PLIST"; then
+  echo "✅ aps-environment capability present"
+else
+  echo "❌ aps-environment capability missing"
+  exit 1
+fi
+
+if grep -q "<key>com.apple.developer.usernotifications</key>" "$ENTITLEMENTS_PLIST"; then
+  echo "✅ com.apple.developer.usernotifications capability present"
+else
+  echo "❌ com.apple.developer.usernotifications capability missing"
+  exit 1
+fi
+
+rm -rf "$TMP_DIR"
 rm -f ipa_contents.log
 
 mkdir -p artifacts
