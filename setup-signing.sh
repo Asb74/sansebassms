@@ -9,23 +9,49 @@ echo "== Setup signing (auto) =="
 need(){ [ -n "${!1:-}" ] || { echo "ERROR: falta $1"; exit 2; }; }
 need APP_STORE_CONNECT_ISSUER_ID
 need APP_STORE_CONNECT_KEY_IDENTIFIER
-need APP_STORE_CONNECT_PRIVATE_KEY     # .p8 (EC)
-need APPLE_CERTIFICATE_PRIVATE_KEY     # RSA 2048 PEM sin passphrase
+need APP_STORE_CONNECT_PRIVATE_KEY     # .p8 (EC) para API ASC
+need APPLE_CERTIFICATE_PRIVATE_KEY     # RSA 2048 PEM sin passphrase (para emitir el cert)
 need APPLE_TEAM_ID
 need BUNDLE_ID
-
-# No usar P12 manual en este flujo
-unset CERTIFICATE_P12_BASE64 P12_PASSWORD || true
 
 # Llavero por defecto de Codemagic
 keychain initialize
 KEYCHAIN_PATH="$(keychain get-default | awk 'END{print $NF}')"
 echo "Default keychain: $KEYCHAIN_PATH"
 
-# Descarga/creación de cert + perfiles (usa la RSA como certificado-key)
+# (Nuevo) Si hay un .mobileprovision en Base64, instálalo
+if [[ -n "${IOS_APPSTORE_PROFILE_B64:-}" ]]; then
+  echo "Instalando perfil desde IOS_APPSTORE_PROFILE_B64..."
+  mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+  TMP_DIR="$(mktemp -d)"
+  echo "$IOS_APPSTORE_PROFILE_B64" | base64 --decode > "$TMP_DIR/profile.mobileprovision"
+
+  # Intenta nombrarlo con el UUID del perfil
+  UUID="$(
+    /usr/bin/security cms -D -i "$TMP_DIR/profile.mobileprovision" 2>/dev/null \
+      | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin 2>/dev/null \
+      || echo "appstore"
+  )"
+  DEST="$HOME/Library/MobileDevice/Provisioning Profiles/${UUID}.mobileprovision"
+  cp -f "$TMP_DIR/profile.mobileprovision" "$DEST"
+  echo "✅ Installed provisioning profile at: $DEST"
+
+  # Mostrar entorno APNs del perfil (esperado: production)
+  if /usr/bin/security cms -D -i "$DEST" >/dev/null 2>&1; then
+    APS="$(
+      /usr/bin/security cms -D -i "$DEST" \
+        | /usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' /dev/stdin 2>/dev/null \
+        || echo "unknown"
+    )"
+    echo "aps-environment del perfil: $APS"
+  fi
+fi
+
+# Determinar flag de clave privada para fetch
 CERT_FLAG="--certificate-key"
 app-store-connect fetch-signing-files --help | grep -q -- "--certificate-key" || CERT_FLAG="--cert-private-key"
 
+# Traer certificados (y perfiles, si hacen falta) desde App Store Connect
 app-store-connect fetch-signing-files "$BUNDLE_ID" \
   --type IOS_APP_STORE \
   --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
@@ -34,8 +60,9 @@ app-store-connect fetch-signing-files "$BUNDLE_ID" \
   $CERT_FLAG "$APPLE_CERTIFICATE_PRIVATE_KEY" \
   --create
 
-# Importar lo descargado al keychain por defecto
+# Importar al llavero y aplicar perfiles al proyecto
 keychain add-certificates || true
+xcode-project use-profiles
 
 echo "Identidades de firma:"
 security find-identity -v -p codesigning "$KEYCHAIN_PATH" || true
