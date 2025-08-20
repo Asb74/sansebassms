@@ -20,6 +20,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await FirebaseMessaging.instance.requestPermission();
   await _initNotifications();
   runApp(const SansebasSmsApp());
 }
@@ -89,7 +90,7 @@ class SansebasSmsApp extends StatelessWidget {
           final uid = user?.uid ?? doc.id;
           final messaging = FirebaseMessaging.instance;
 
-          final settings = await messaging.requestPermission();
+          final settings = await messaging.getNotificationSettings();
           if (settings.authorizationStatus != AuthorizationStatus.denied) {
             if (Platform.isIOS) {
               try {
@@ -109,7 +110,7 @@ class SansebasSmsApp extends StatelessWidget {
                 await FirebaseFirestore.instance
                     .collection("UsuariosAutorizados")
                     .doc(uid)
-                    .update({"fcmToken": token});
+                    .set({"fcmToken": token}, SetOptions(merge: true));
               } else {
                 _mostrarErrorToken();
               }
@@ -119,7 +120,7 @@ class SansebasSmsApp extends StatelessWidget {
                 await FirebaseFirestore.instance
                     .collection("UsuariosAutorizados")
                     .doc(uid)
-                    .update({"fcmToken": nuevoToken});
+                    .set({"fcmToken": nuevoToken}, SetOptions(merge: true));
               });
             } catch (e) {
               _mostrarErrorToken();
