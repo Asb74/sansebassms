@@ -32,6 +32,10 @@ workflows:
 
           # Validar que el plist exista
           test -f ios/Runner/GoogleService-Info.plist || { echo "Plist no encontrado"; exit 1; }
+      - name: Patch iOS identifiers
+        script: |
+          chmod +x ios/patch-ios-identifiers.sh
+          ./ios/patch-ios-identifiers.sh
       - name: Build IPA
         script: |
           chmod +x build-ipa.sh
