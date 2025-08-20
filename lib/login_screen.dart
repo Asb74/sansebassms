@@ -26,6 +26,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
   String? _textoLPD;
   bool _aceptaLPD = false;
+  bool _tokenPendiente = false;
 
   @override
   void initState() {
@@ -229,14 +230,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final uid = cred.user!.uid;
         final fcmToken = await _obtenerTokenFcm();
-        if (fcmToken == null) {
-          setState(() {
-            _error =
-                "⚠️ No se pudo generar el token de notificación. Revisa los permisos de notificaciones.";
-            _loading = false;
-          });
-          return;
-        }
+        final tokenPendiente = fcmToken == null;
 
         await FirebaseFirestore.instance
             .collection("UsuariosAutorizados")
@@ -249,13 +243,17 @@ class _LoginScreenState extends State<LoginScreen> {
           "Telefono": telefono,
           "Mensaje": false,
           "Dni": dni,
-          "fcmToken": fcmToken,
+          "fcmToken": fcmToken ?? "",
+          "tokenPendiente": tokenPendiente,
         });
 
         await prefs.setBool("registroRealizado", true);
 
         setState(() {
-          _error = "✅ Cuenta registrada. Espera la autorización del administrador.";
+          _tokenPendiente = tokenPendiente;
+          _error = tokenPendiente
+              ? "✅ Cuenta registrada, pero no recibirás notificaciones hasta habilitar los permisos y actualizar el token."
+              : "✅ Cuenta registrada. Espera la autorización del administrador.";
         });
       }
     } catch (e) {
@@ -335,7 +333,13 @@ class _LoginScreenState extends State<LoginScreen> {
                 Text(
                   _error!,
                   style: const TextStyle(color: Colors.red),
+                  textAlign: TextAlign.center,
                 ),
+                if (_tokenPendiente)
+                  TextButton(
+                    onPressed: () => Navigator.pushNamed(context, '/actualizar-token'),
+                    child: const Text("Actualizar token"),
+                  ),
               ]
             ],
           ),
