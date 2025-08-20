@@ -151,6 +151,7 @@
 				9740EEB61CF901F6004384FC /* Run Script */,
 				97C146EA1CF9000F007C117D /* Sources */,
 				97C146EB1CF9000F007C117D /* Frameworks */,
+				FB075BAEE74D681635176262 /* GoogleService-Info.plist */,
 				97C146EC1CF9000F007C117D /* Resources */,
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
@@ -256,6 +257,21 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build";
+		};
+		FB075BAEE74D681635176262 /* GoogleService-Info.plist */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "GoogleService-Info.plist";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ -n \"$GOOGLE_SERVICE_INFO_PLIST_B64\" ]; then\n  python3 - <<'PY'\nimport os,base64,sys,pathlib\nb64=os.environ.get(\"GOOGLE_SERVICE_INFO_PLIST_B64\",\"\")\np=pathlib.Path(os.environ[\"PROJECT_DIR\"])/\"Runner\"/\"GoogleService-Info.plist\"\np.parent.mkdir(parents=True, exist_ok=True)\np.write_bytes(base64.b64decode(b64))\nprint(f\"Escrito {p} ({p.stat().st_size} bytes)\")\nPY\nfi\nif [ -f \"${PROJECT_DIR}/Runner/GoogleService-Info.plist\" ]; then\n  cp \"${PROJECT_DIR}/Runner/GoogleService-Info.plist\" \"${TARGET_BUILD_DIR}/${WRAPPER_NAME}/GoogleService-Info.plist\"\n  echo \"Copiado en ${TARGET_BUILD_DIR}/${WRAPPER_NAME}/GoogleService-Info.plist\"\nelse\n  echo \"⚠️ No existe ${PROJECT_DIR}/Runner/GoogleService-Info.plist\"\nfi";
 		};
 /* End PBXShellScriptBuildPhase section */
 
