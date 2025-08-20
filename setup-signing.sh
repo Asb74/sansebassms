@@ -19,32 +19,25 @@ keychain initialize
 KEYCHAIN_PATH="$(keychain get-default | awk 'END{print $NF}')"
 echo "Default keychain: $KEYCHAIN_PATH"
 
-# (Nuevo) Si hay un .mobileprovision en Base64, instálalo
+# (Nuevo) Si hay un .mobileprovision en Base64, instálalo (sin usar /dev/stdin)
 if [[ -n "${IOS_APPSTORE_PROFILE_B64:-}" ]]; then
   echo "Instalando perfil desde IOS_APPSTORE_PROFILE_B64..."
-  mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+  INSTALL_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+  mkdir -p "$INSTALL_DIR"
+
   TMP_DIR="$(mktemp -d)"
   echo "$IOS_APPSTORE_PROFILE_B64" | base64 --decode > "$TMP_DIR/profile.mobileprovision"
 
-  # Intenta nombrarlo con el UUID del perfil
-  UUID="$(
-    /usr/bin/security cms -D -i "$TMP_DIR/profile.mobileprovision" 2>/dev/null \
-      | /usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin 2>/dev/null \
-      || echo "appstore"
-  )"
-  DEST="$HOME/Library/MobileDevice/Provisioning Profiles/${UUID}.mobileprovision"
+  # Copiar con nombre fijo (evita parsear UUID para no depender de /dev/stdin)
+  DEST="$INSTALL_DIR/appstore.mobileprovision"
   cp -f "$TMP_DIR/profile.mobileprovision" "$DEST"
   echo "✅ Installed provisioning profile at: $DEST"
 
-  # Mostrar entorno APNs del perfil (esperado: production)
-  if /usr/bin/security cms -D -i "$DEST" >/dev/null 2>&1; then
-    APS="$(
-      /usr/bin/security cms -D -i "$DEST" \
-        | /usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' /dev/stdin 2>/dev/null \
-        || echo "unknown"
-    )"
-    echo "aps-environment del perfil: $APS"
-  fi
+  # Mostrar entorno APNs del perfil (esperado: production o development)
+  DECODED="$TMP_DIR/decoded.plist"
+  /usr/bin/security cms -D -i "$DEST" > "$DECODED" 2>/dev/null || true
+  APS=$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$DECODED" 2>/dev/null || echo "unknown")
+  echo "aps-environment del perfil: $APS"
 fi
 
 # Determinar flag de clave privada para fetch
