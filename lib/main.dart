@@ -54,6 +54,20 @@ class SansebasSmsApp extends StatelessWidget {
     final contrasena = prefs.getString("contrasena");
     await Future.delayed(const Duration(milliseconds: 1500));
 
+    void _mostrarErrorToken() {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final ctx = navigatorKey.currentContext;
+        if (ctx != null) {
+          ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  '⚠️ No se pudo obtener el token de notificaciones. Revisa los permisos de notificaciones.'),
+            ),
+          );
+        }
+      });
+    }
+
     if (correo != null && contrasena != null) {
       final query = await FirebaseFirestore.instance
           .collection("UsuariosAutorizados")
@@ -77,31 +91,42 @@ class SansebasSmsApp extends StatelessWidget {
           final settings = await messaging.requestPermission();
           if (settings.authorizationStatus != AuthorizationStatus.denied) {
             if (Platform.isIOS) {
-              String? apnsToken = await messaging.getAPNSToken();
-              while (apnsToken == null) {
-                await Future.delayed(const Duration(milliseconds: 500));
-                apnsToken = await messaging.getAPNSToken();
+              try {
+                await messaging
+                    .getAPNSToken()
+                    .timeout(const Duration(seconds: 5));
+              } catch (_) {
+                _mostrarErrorToken();
               }
             }
 
-            final token = await messaging.getToken();
-            if (token != null) {
-              await FirebaseFirestore.instance
-                  .collection("UsuariosAutorizados")
-                  .doc(uid)
-                  .update({"fcmToken": token});
-            }
+            try {
+              final token = await messaging
+                  .getToken()
+                  .timeout(const Duration(seconds: 5), onTimeout: () => null);
+              if (token != null) {
+                await FirebaseFirestore.instance
+                    .collection("UsuariosAutorizados")
+                    .doc(uid)
+                    .update({"fcmToken": token});
+              } else {
+                _mostrarErrorToken();
+              }
 
-            // 🔁 Escuchar cambios futuros del token
-            messaging.onTokenRefresh.listen((nuevoToken) async {
-              await FirebaseFirestore.instance
-                  .collection("UsuariosAutorizados")
-                  .doc(uid)
-                  .update({"fcmToken": nuevoToken});
-            });
+              // 🔁 Escuchar cambios futuros del token
+              messaging.onTokenRefresh.listen((nuevoToken) async {
+                await FirebaseFirestore.instance
+                    .collection("UsuariosAutorizados")
+                    .doc(uid)
+                    .update({"fcmToken": nuevoToken});
+              });
+            } catch (e) {
+              _mostrarErrorToken();
+            }
           }
         } catch (e) {
-          print("⚠️ No se pudo actualizar el token FCM: $e");
+          debugPrint("⚠️ No se pudo actualizar el token FCM: $e");
+          _mostrarErrorToken();
         }
 
         if (rol == "admin") return const HomeScreen();
