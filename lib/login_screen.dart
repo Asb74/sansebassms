@@ -79,14 +79,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (Platform.isIOS) {
-        String? apnsToken = await messaging.getAPNSToken();
-        while (apnsToken == null) {
-          await Future.delayed(const Duration(milliseconds: 500));
-          apnsToken = await messaging.getAPNSToken();
+        try {
+          await messaging
+              .getAPNSToken()
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {
+          return null;
         }
       }
 
-      return await messaging.getToken();
+      return await messaging
+          .getToken()
+          .timeout(const Duration(seconds: 5), onTimeout: () => null);
     } catch (_) {
       return null;
     }
@@ -228,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (fcmToken == null) {
           setState(() {
             _error =
-                "⚠️ No se pudo generar el token de notificación. Inténtalo más tarde.";
+                "⚠️ No se pudo generar el token de notificación. Revisa los permisos de notificaciones.";
             _loading = false;
           });
           return;
