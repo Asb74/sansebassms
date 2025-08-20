@@ -6,7 +6,7 @@ workflows:
       xcode: 16.2
       flutter: stable
       vars:
-        BUNDLE_ID: com.example.sansebassms
+        BUNDLE_ID: com.sansebas.sansebassms
         APPLE_TEAM_ID: 7QWJ8R3ZB5
       groups:
         - app_store_connect
