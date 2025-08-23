@@ -29,10 +29,10 @@ workflows:
             exit 2
           fi
 
-          # Comprobación contra App Store Connect
           echo "Validando API key de App Store Connect y acceso al bundle ${BUNDLE_ID} ..."
           app-store-connect list-bundle-ids \
-            --identifier "$BUNDLE_ID" \
+            --bundle-id-identifier "$BUNDLE_ID" \
+            --strict-match-identifier \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
             --private-key "$ASC_KEY_SANITIZED" \
