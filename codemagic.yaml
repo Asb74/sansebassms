@@ -8,6 +8,7 @@ workflows:
       vars:
         BUNDLE_ID: com.sansebas.sansebassms
         APPLE_TEAM_ID: 7QWJ8R3ZB5
+        BETA_GROUPS: Internal Testers
       groups:
         - app_store_connect
     scripts:
@@ -40,6 +41,28 @@ workflows:
         script: |
           chmod +x build-ipa.sh
           ./build-ipa.sh
+
+      - name: Upload to TestFlight (CLI fallback)
+        script: |
+          set -euo pipefail
+          mkdir -p artifacts
+          IPA_PATH="$(ls -1 build/ios/ipa/*.ipa | head -n 1)"
+          if [ -z "${IPA_PATH:-}" ] || [ ! -f "$IPA_PATH" ]; then
+            echo "No se encontró el IPA en build/ios/ipa/"
+            exit 1
+          fi
+
+          echo "Subiendo $IPA_PATH a TestFlight (beta groups: ${BETA_GROUPS:-Internal Testers})..."
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --testflight \
+            --beta-groups "${BETA_GROUPS:-Internal Testers}" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            2>&1 | tee artifacts/testflight_upload.log
+
+          echo "Upload a TestFlight lanzado correctamente (revisa artifacts/testflight_upload.log)."
       - name: Upload to App Store Connect (fallback)
         script: |
           set -euo pipefail
