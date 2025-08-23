@@ -42,7 +42,7 @@ app-store-connect fetch-signing-files "$BUNDLE_ID" \
   --type IOS_APP_STORE \
   --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
   --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-  --private-key "$ASC_KEY" \
+  --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
   $CERT_FLAG "$APPLE_CERTIFICATE_PRIVATE_KEY" \
   --create
 
