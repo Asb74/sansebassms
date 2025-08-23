@@ -8,17 +8,26 @@ workflows:
       vars:
         BUNDLE_ID: com.sansebas.sansebassms
         APPLE_TEAM_ID: 7QWJ8R3ZB5
-        BETA_GROUPS: Internal Testers
       groups:
         - app_store_connect
     scripts:
+      - name: Check App Store Connect API key
+        script: |
+          set -euo pipefail
+          ASC_KEY=/tmp/asc_api_key.p8
+          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$ASC_KEY"
+          app-store-connect whoami \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$ASC_KEY"
+
       - name: Setup signing
         script: |
           chmod +x setup-signing.sh
           ./setup-signing.sh
+
       - name: Recreate GoogleService-Info.plist
         script: |
-          # Recrear GoogleService-Info.plist desde la variable de entorno
           python3 - <<'PY'
           import os, base64, pathlib, sys
           b64 = os.environ.get("GOOGLE_SERVICE_INFO_PLIST_B64", "")
@@ -30,60 +39,25 @@ workflows:
           path.write_bytes(base64.b64decode(b64))
           print(f"Wrote {path} ({path.stat().st_size} bytes)")
           PY
-
-          # Validar que el plist exista
           test -f ios/Runner/GoogleService-Info.plist || { echo "Plist no encontrado"; exit 1; }
+
       - name: Patch iOS identifiers
         script: |
           chmod +x ios/patch-ios-identifiers.sh
           ./ios/patch-ios-identifiers.sh
+
       - name: Build IPA
         script: |
           chmod +x build-ipa.sh
           ./build-ipa.sh
 
-      - name: Upload to TestFlight (CLI fallback)
-        script: |
-          set -euo pipefail
-          mkdir -p artifacts
-          IPA_PATH="$(ls -1 build/ios/ipa/*.ipa | head -n 1)"
-          if [ -z "${IPA_PATH:-}" ] || [ ! -f "$IPA_PATH" ]; then
-            echo "No se encontró el IPA en build/ios/ipa/"
-            exit 1
-          fi
-
-          echo "Subiendo $IPA_PATH a TestFlight (beta groups: ${BETA_GROUPS:-Internal Testers})..."
-          app-store-connect publish \
-            --path "$IPA_PATH" \
-            --testflight \
-            --beta-groups "${BETA_GROUPS:-Internal Testers}" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            2>&1 | tee artifacts/testflight_upload.log
-
-          echo "Upload a TestFlight lanzado correctamente (revisa artifacts/testflight_upload.log)."
-      - name: Upload to App Store Connect (fallback)
-        script: |
-          set -euo pipefail
-          IPA_PATH="$(ls -1 build/ios/ipa/*.ipa | head -n 1)"
-          echo "IPA to upload: ${IPA_PATH}"
-          test -f "$IPA_PATH"
-          app-store-connect publish \
-            --path "$IPA_PATH" \
-            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
-            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
-            --bundle-id "$BUNDLE_ID" \
-            --submit-to-testflight true \
-            --beta-group "Internal Testers" \
-            --verbose
     artifacts:
       - build/ios/ipa/*.ipa
       - codemagic_prebuild.log
       - codemagic_setup_signing.log
       - codemagic_build_ipa.log
       - artifacts/*
+
     publishing:
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
