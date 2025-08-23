@@ -10,6 +10,11 @@ jobs:
   ios:
     runs-on: macos-latest
     timeout-minutes: 60
+    env:
+      LOG_FILE: workflow.log
+    defaults:
+      run:
+        shell: bash {0} 2>&1 | tee -a "$LOG_FILE"
 
     steps:
       - name: Checkout
@@ -24,6 +29,9 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+
+      - name: Initialize workflow log
+        run: echo "Workflow log start" > "$LOG_FILE"
 
       - name: Flutter pub get
         run: flutter pub get
@@ -54,7 +62,6 @@ jobs:
           brew install jq
 
       - name: Decode signing assets
-        shell: bash
         run: |
           # P12 y perfil
           printf "%s" "${{ secrets.P12_BASE64 }}" | base64 --decode > cert.p12
@@ -65,13 +72,11 @@ jobs:
           printf "%s" "${{ secrets.APP_STORE_CONNECT_API_KEY_BASE64 }}" | base64 --decode > AuthKey.p8
 
       - name: Verify P12 (hash + password)
-        shell: bash
         run: |
           echo "Runner SHA256:"; shasum -a 256 cert.p12
           openssl pkcs12 -in cert.p12 -nokeys -passin file:p12pass.txt -info >/dev/null
 
       - name: Extract cert & key with OpenSSL
-        shell: bash
         run: |
           openssl pkcs12 -in cert.p12 -clcerts -nokeys -passin file:p12pass.txt -out dist-cert.cer
           openssl pkcs12 -in cert.p12 -nocerts -nodes -passin file:p12pass.txt -out dist-key-raw.pem
@@ -82,7 +87,6 @@ jobs:
           cat certsha1.env
 
       - name: Create dedicated keychain & import identities (robusto)
-        shell: bash
         env:
           KEYCHAIN_PASSWORD: actions
         run: |
@@ -106,7 +110,6 @@ jobs:
           security find-identity -v -p codesigning build.keychain || true
 
       - name: Install provisioning profile
-        shell: bash
         run: |
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
           UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' /dev/stdin <<< "$(security cms -D -i profile.mobileprovision)")
@@ -136,7 +139,6 @@ jobs:
           EOF
 
       - name: Fix FLUTTER_ROOT for iOS build
-        shell: bash
         run: |
           mkdir -p ios/Flutter
           if [ -f ios/Flutter/Generated.xcconfig ]; then
@@ -156,7 +158,6 @@ jobs:
         run: flutter build ios --release --no-codesign
 
       - name: Archive with xcodebuild (unsigned)
-        shell: bash
         run: |
           set -e
           # Clear environment C/C++ flags that may inject unsupported options
@@ -173,7 +174,6 @@ jobs:
             clean archive
 
       - name: Export IPA
-        shell: bash
         run: |
           xcodebuild -exportArchive \
             -archivePath build/Runner.xcarchive \
@@ -203,3 +203,10 @@ jobs:
         with:
           name: ios-signed-ipa
           path: build/ios_export/*.ipa
+
+      - name: Upload workflow log artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-log
+          path: ${{ env.LOG_FILE }}
