@@ -14,17 +14,21 @@ workflows:
       - name: Check App Store Connect API key
         script: |
           set -euo pipefail
-          ASC_KEY=/tmp/asc_api_key.p8
-          printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" > "$ASC_KEY"
-
           mkdir -p artifacts
+
+          # Sanity: debe ser un PEM multilínea válido
+          if ! printf '%s\n' "$APP_STORE_CONNECT_PRIVATE_KEY" | grep -q '-----BEGIN PRIVATE KEY-----'; then
+            echo "❌ APP_STORE_CONNECT_PRIVATE_KEY no contiene un PEM válido (revisa que sea multilínea y con BEGIN/END)."
+            exit 2
+          fi
+
           echo "Validando API key de App Store Connect y acceso al bundle ${BUNDLE_ID} ..."
           app-store-connect list-bundle-ids \
             --identifier "$BUNDLE_ID" \
             --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
             --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
-            --private-key "$ASC_KEY" \
-            > artifacts/asc_check.json
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --json > artifacts/asc_check.json
 
           echo "Salida guardada en artifacts/asc_check.json"
           if grep -q "\"identifier\": \"${BUNDLE_ID}\"" artifacts/asc_check.json; then
