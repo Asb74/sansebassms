@@ -40,6 +40,21 @@ workflows:
         script: |
           chmod +x build-ipa.sh
           ./build-ipa.sh
+      - name: Upload to App Store Connect (fallback)
+        script: |
+          set -euo pipefail
+          IPA_PATH="$(ls -1 build/ios/ipa/*.ipa | head -n 1)"
+          echo "IPA to upload: ${IPA_PATH}"
+          test -f "$IPA_PATH"
+          app-store-connect publish \
+            --path "$IPA_PATH" \
+            --issuer-id "$APP_STORE_CONNECT_ISSUER_ID" \
+            --key-id "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            --private-key "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            --bundle-id "$BUNDLE_ID" \
+            --submit-to-testflight true \
+            --beta-group "Internal Testers" \
+            --verbose
     artifacts:
       - build/ios/ipa/*.ipa
       - codemagic_prebuild.log
