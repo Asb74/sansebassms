@@ -196,36 +196,73 @@ class _UsuarioScreenState extends State<UsuarioScreen> {
         child: ListView.builder(
           itemCount: mensajesPendientes.length,
           itemBuilder: (context, index) {
-            final mensaje = mensajesPendientes[index];
-            final docId = mensaje.id;
-            final texto = mensaje['mensaje'] ?? '';
+            final doc = mensajesPendientes[index];
+            final docId = doc.id;
+            final data = doc.data() as Map<String, dynamic>? ?? {};
+            final String mensaje = (data['mensaje'] ?? '').toString();
+            final String dia = (data['dia'] ?? '').toString();
+            final String hora = (data['hora'] ?? '').toString();
+            final String cuerpo = (data['cuerpo'] ?? '').toString();
 
             return Card(
+              elevation: 1.5,
               margin: const EdgeInsets.symmetric(vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Mensaje:", style: TextStyle(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 8),
-                    Text(texto),
+                    const Text(
+                      'Mensaje:',
+                      style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      mensaje.isEmpty ? '—' : mensaje,
+                      style: const TextStyle(fontSize: 15),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        const Text('Día: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Expanded(child: Text(dia.isEmpty ? '—' : dia)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Text('Hora: ', style: TextStyle(fontWeight: FontWeight.w500)),
+                        Expanded(child: Text(hora.isEmpty ? '—' : hora)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text('Cuerpo:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 4),
+                    Text(
+                      cuerpo.isEmpty ? '—' : cuerpo,
+                      textAlign: TextAlign.start,
+                    ),
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.check),
-                          label: const Text("Aceptar"),
-                          onPressed: () => _actualizarEstado(docId, "OK"),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _actualizarEstado(docId, 'OK'),
+                            icon: const Icon(Icons.check),
+                            label: const Text('Aceptar'),
+                          ),
                         ),
-                        const SizedBox(width: 16),
-                        ElevatedButton.icon(
-                          icon: const Icon(Icons.close),
-                          label: const Text("Rechazar"),
-                          onPressed: () => _mostrarMotivos(docId),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _mostrarMotivos(docId),
+                            icon: const Icon(Icons.close),
+                            label: const Text('Rechazar'),
+                          ),
                         ),
                       ],
-                    )
+                    ),
                   ],
                 ),
               ),
