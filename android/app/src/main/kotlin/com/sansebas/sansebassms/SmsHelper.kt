@@ -1,4 +1,4 @@
-package com.example.sansebassms
+package com.sansebas.sansebassms
 
 import android.app.Activity
 import android.telephony.SmsManager

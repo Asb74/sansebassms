@@ -16,7 +16,7 @@ val keystoreProps = Properties().apply {
 }
 
 android {
-    namespace = "com.example.sansebassms"
+    namespace = "com.sansebas.sansebassms"
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
@@ -31,7 +31,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.sansebassms"
+        applicationId = "com.sansebas.sansebassms"
         minSdk = 23
         targetSdk = 35
         versionCode = 1
