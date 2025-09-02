@@ -1,8 +1,18 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("dev.flutter.flutter-gradle-plugin")
     id("com.google.gms.google-services") // ✅ Activa Google Services plugin
+}
+
+val keystorePropsFile = rootProject.file("key.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) {
+        FileInputStream(keystorePropsFile).use { load(it) }
+    }
 }
 
 android {
@@ -31,9 +41,30 @@ android {
         multiDexEnabled = true
     }
 
+    signingConfigs {
+        // Create or update the release signing config
+        if (keystorePropsFile.exists()) {
+            create("release") {
+                val storeFilePath = keystoreProps.getProperty("storeFile") ?: ""
+                if (storeFilePath.isNotBlank()) {
+                    storeFile = file(storeFilePath)
+                }
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+                enableV1Signing = true
+                enableV2Signing = true
+            }
+        }
+    }
+
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
+        getByName("release") {
+            // Only assign if we actually created the signing config
+            if (signingConfigs.names.contains("release")) {
+                signingConfig = signingConfigs.getByName("release")
+            }
+            // keep existing minify/shrink settings; if none exist, don't add new ones
         }
     }
 }
