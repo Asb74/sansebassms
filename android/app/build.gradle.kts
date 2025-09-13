@@ -15,6 +15,9 @@ val keystoreProps = Properties().apply {
     }
 }
 
+val flutterVersionCode = project.properties["flutter.versionCode"] as String? ?: "1"
+val flutterVersionName = project.properties["flutter.versionName"] as String? ?: "1.0"
+
 android {
     namespace = "com.sansebas.sansebassms"
     compileSdk = 35
@@ -34,8 +37,8 @@ android {
         applicationId = "com.sansebas.sansebassms"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = flutterVersionCode.toInt()
+        versionName = flutterVersionName
 
         // ✅ Habilitar multidex
         multiDexEnabled = true
