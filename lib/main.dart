@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -144,9 +145,21 @@ class SansebasSmsApp extends StatelessWidget {
     return MaterialApp(
       title: 'SansebasSms',
       navigatorKey: navigatorKey,
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
+      ],
       theme: ThemeData(
-        primarySwatch: Colors.green,
+        colorSchemeSeed: Colors.green,
         useMaterial3: true,
+        dialogTheme: const DialogTheme(
+          surfaceTintColor: Colors.transparent,
+        ),
       ),
       routes: {
         '/usuario': (_) => const UsuarioScreen(),
