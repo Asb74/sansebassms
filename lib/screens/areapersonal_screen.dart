@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'mis_peticiones_screen.dart';
 import 'report_mensajes_screen.dart';
 
 class AreaPersonalScreen extends StatefulWidget {
@@ -99,6 +100,22 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
                 )
               : const Icon(Icons.chevron_right),
           onTap: _guardando ? null : _solicitarDiaLibre,
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.list_alt),
+          title: const Text('Mis peticiones'),
+          subtitle:
+              const Text('Ver historial y cancelar las pendientes'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const MisPeticionesScreen(),
+              ),
+            );
+          },
         ),
       ),
       Card(
