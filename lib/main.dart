@@ -14,6 +14,7 @@ import 'home_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/usuario_screen.dart';
 import 'screens/actualizar_token_screen.dart';
+import 'theme/dialog_theme.dart';
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -157,9 +158,7 @@ class SansebasSmsApp extends StatelessWidget {
       theme: ThemeData(
         colorSchemeSeed: Colors.green,
         useMaterial3: true,
-        dialogTheme: const DialogThemeData(
-          surfaceTintColor: Colors.transparent,
-        ),
+        dialogTheme: transparentDialogTheme,
       ),
       routes: {
         '/usuario': (_) => const UsuarioScreen(),

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../theme/dialog_theme.dart';
 import 'mis_peticiones_screen.dart';
 import 'report_mensajes_screen.dart';
 
@@ -50,9 +51,7 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
               onSurface: Colors.black,
               primary: scheme.primary,
             ),
-            dialogTheme: const DialogThemeData(
-              surfaceTintColor: Colors.transparent,
-            ),
+            dialogTheme: transparentDialogTheme,
           ),
           child: child,
         );
