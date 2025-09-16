@@ -24,12 +24,39 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
       return;
     }
 
+    final now = DateTime.now();
+    final firstDate = DateTime(now.year, now.month, now.day);
+    final lastDate = firstDate.add(const Duration(days: 365));
+    DateTime initialDate = now.isBefore(firstDate) ? firstDate : now;
+    if (initialDate.isAfter(lastDate)) {
+      initialDate = lastDate;
+    }
+
     final picked = await showDatePicker(
       context: context,
+      initialDate: initialDate,
+      firstDate: firstDate,
+      lastDate: lastDate,
       locale: const Locale('es', 'ES'),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDate: DateTime.now(),
+      useRootNavigator: true,
+      builder: (ctx, child) {
+        if (child == null) return const SizedBox.shrink();
+        final baseTheme = Theme.of(ctx);
+        final scheme = baseTheme.colorScheme;
+        return Theme(
+          data: baseTheme.copyWith(
+            colorScheme: scheme.copyWith(
+              surface: Colors.white,
+              onSurface: Colors.black,
+              primary: scheme.primary,
+            ),
+            dialogTheme: const DialogTheme(
+              surfaceTintColor: Colors.transparent,
+            ),
+          ),
+          child: child,
+        );
+      },
     );
 
     if (picked == null) {
@@ -64,9 +91,14 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
 
       if (!mounted) return;
       _mostrarSnackBar('Petición registrada para $formattedDate');
-    } catch (e) {
+    } on FirebaseException catch (e) {
+      debugPrint('Error guardando petición: ${e.message ?? e.code}');
       if (!mounted) return;
-      _mostrarSnackBar('Error al guardar la petición: ${e.toString()}');
+      _mostrarSnackBar('Error al guardar la petición.');
+    } catch (e) {
+      debugPrint('Error guardando petición: $e');
+      if (!mounted) return;
+      _mostrarSnackBar('Error al guardar la petición.');
     } finally {
       if (mounted) {
         setState(() {

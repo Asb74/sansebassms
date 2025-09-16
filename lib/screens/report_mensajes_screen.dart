@@ -38,6 +38,7 @@ class ReportMensajesScreen extends StatelessWidget {
         stream: mensajesQuery.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            debugPrint('InformeMensajes error: ${snapshot.error}');
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),

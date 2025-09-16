@@ -12,7 +12,12 @@ class MisPeticionesScreen extends StatelessWidget {
   Future<void> _cancelPeticion(
     BuildContext context,
     DocumentSnapshot<Map<String, dynamic>> doc,
+    String estado,
   ) async {
+    if (estado != 'Pendiente') {
+      return;
+    }
+
     final confirmacion = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
@@ -44,15 +49,17 @@ class MisPeticionesScreen extends StatelessWidget {
     try {
       await doc.reference.delete();
       messenger.showSnackBar(
-        const SnackBar(content: Text('Petición cancelada correctamente.')),
+        const SnackBar(content: Text('Petición cancelada.')),
       );
     } on FirebaseException catch (e) {
+      debugPrint('Error al cancelar petición: ${e.message ?? e.code}');
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo cancelar: ${e.message ?? e.code}')),
+        const SnackBar(content: Text('No se pudo cancelar la petición.')),
       );
     } catch (e) {
+      debugPrint('Error al cancelar petición: $e');
       messenger.showSnackBar(
-        SnackBar(content: Text('No se pudo cancelar: $e')),
+        const SnackBar(content: Text('No se pudo cancelar la petición.')),
       );
     } finally {
       final updated = {..._deleting.value};
@@ -103,6 +110,7 @@ class MisPeticionesScreen extends StatelessWidget {
         stream: query.snapshots(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
+            debugPrint('MisPeticiones error: ${snapshot.error}');
             return const Center(
               child: Padding(
                 padding: EdgeInsets.all(24),
@@ -164,7 +172,8 @@ class MisPeticionesScreen extends StatelessWidget {
                                   foregroundColor:
                                       Theme.of(context).colorScheme.error,
                                 ),
-                                onPressed: () => _cancelPeticion(context, doc),
+                                onPressed: () =>
+                                    _cancelPeticion(context, doc, estado),
                               );
                             },
                           )
