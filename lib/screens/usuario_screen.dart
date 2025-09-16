@@ -211,11 +211,16 @@ class _UsuarioScreenState extends State<UsuarioScreen> {
           itemBuilder: (context, index) {
             final doc = mensajesPendientes[index];
             final docId = doc.id;
-            final data = doc.data() as Map<String, dynamic>? ?? {};
+            final Map<String, dynamic> data =
+                (doc.data() as Map<String, dynamic>?) ?? <String, dynamic>{};
             final String mensaje = (data['mensaje'] ?? '').toString();
             final String dia = (data['dia'] ?? '').toString();
             final String hora = (data['hora'] ?? '').toString();
             final String cuerpo = (data['cuerpo'] ?? '').toString();
+            final String mensajeTexto = mensaje.isEmpty ? '—' : mensaje;
+            final String diaTexto = dia.isEmpty ? '—' : dia;
+            final String horaTexto = hora.isEmpty ? '—' : hora;
+            final String cuerpoTexto = cuerpo.isEmpty ? '—' : cuerpo;
 
             return Card(
               elevation: 1.5,
@@ -232,28 +237,28 @@ class _UsuarioScreenState extends State<UsuarioScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      mensaje.isEmpty ? '—' : mensaje,
+                      mensajeTexto,
                       style: const TextStyle(fontSize: 15),
                     ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         const Text('Día: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                        Expanded(child: Text(dia.isEmpty ? '—' : dia)),
+                        Expanded(child: Text(diaTexto)),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Text('Hora: ', style: TextStyle(fontWeight: FontWeight.w500)),
-                        Expanded(child: Text(hora.isEmpty ? '—' : hora)),
+                        Expanded(child: Text(horaTexto)),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     const Text('Cuerpo:', style: TextStyle(fontWeight: FontWeight.w500)),
                     const SizedBox(height: 4),
                     Text(
-                      cuerpo.isEmpty ? '—' : cuerpo,
+                      cuerpoTexto,
                       textAlign: TextAlign.start,
                     ),
                     const SizedBox(height: 16),
