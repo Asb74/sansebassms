@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import 'report_mensajes_screen.dart';
+
 class AreaPersonalScreen extends StatefulWidget {
   const AreaPersonalScreen({super.key});
 
@@ -97,6 +99,21 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
                 )
               : const Icon(Icons.chevron_right),
           onTap: _guardando ? null : _solicitarDiaLibre,
+        ),
+      ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.receipt_long),
+          title: const Text('Informe de mis mensajes'),
+          subtitle: const Text('Consulta tus últimos mensajes enviados'),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const ReportMensajesScreen(),
+              ),
+            );
+          },
         ),
       ),
     ];
