@@ -6,6 +6,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import 'areapersonal_screen.dart';
+
 class UsuarioScreen extends StatefulWidget {
   const UsuarioScreen({super.key});
 
@@ -186,6 +188,17 @@ class _UsuarioScreenState extends State<UsuarioScreen> {
             ],
           ),
         ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const AreaPersonalScreen(),
+              ),
+            );
+          },
+          icon: const Icon(Icons.person),
+          label: const Text('Área personal'),
+        ),
       );
     }
 
@@ -269,6 +282,17 @@ class _UsuarioScreenState extends State<UsuarioScreen> {
             );
           },
         ),
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const AreaPersonalScreen(),
+            ),
+          );
+        },
+        icon: const Icon(Icons.person),
+        label: const Text('Área personal'),
       ),
     );
   }
