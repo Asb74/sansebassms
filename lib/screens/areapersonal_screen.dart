@@ -50,7 +50,7 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
               onSurface: Colors.black,
               primary: scheme.primary,
             ),
-            dialogTheme: const DialogTheme(
+            dialogTheme: const DialogThemeData(
               surfaceTintColor: Colors.transparent,
             ),
           ),

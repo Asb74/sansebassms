@@ -157,7 +157,7 @@ class SansebasSmsApp extends StatelessWidget {
       theme: ThemeData(
         colorSchemeSeed: Colors.green,
         useMaterial3: true,
-        dialogTheme: const DialogTheme(
+        dialogTheme: const DialogThemeData(
           surfaceTintColor: Colors.transparent,
         ),
       ),
