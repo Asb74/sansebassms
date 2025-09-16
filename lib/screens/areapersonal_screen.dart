@@ -15,76 +15,141 @@ class AreaPersonalScreen extends StatefulWidget {
 
 class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
   bool _guardando = false;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  Future<void> _solicitarDiaLibre() async {
-    final user = FirebaseAuth.instance.currentUser;
-
+  Future<void> _peticionDiaLibre() async {
+    final user = _auth.currentUser;
     if (user == null) {
-      _mostrarSnackBar('Debes iniciar sesión');
-      return;
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      locale: const Locale('es', 'ES'),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-      initialDate: DateTime.now(),
-    );
-
-    if (picked == null) {
-      return;
-    }
-
-    final selectedDate = DateTime(picked.year, picked.month, picked.day);
-    final formattedDate = DateFormat('yyyyMMdd').format(selectedDate);
-    final docId = '${user.uid}_$formattedDate';
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _guardando = true;
-    });
-
-    try {
-      await FirebaseFirestore.instance
-          .collection('Peticiones')
-          .doc(docId)
-          .set(
-        {
-          'uid': user.uid,
-          'Fecha': Timestamp.fromDate(selectedDate),
-          'Admitido': 'Pendiente',
-          'creadoEn': FieldValue.serverTimestamp(),
-        },
-        SetOptions(merge: true),
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Debes iniciar sesión')),
       );
-
-      if (!mounted) return;
-      _mostrarSnackBar('Petición registrada para $formattedDate');
-    } catch (e) {
-      if (!mounted) return;
-      _mostrarSnackBar('Error al guardar la petición: ${e.toString()}');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _guardando = false;
-        });
-      }
+      return;
     }
-  }
 
-  void _mostrarSnackBar(String mensaje) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(mensaje)),
+    // Rango y fecha inicial seguros
+    final now = DateTime.now();
+    final first = DateTime(now.year, now.month, now.day); // hoy 00:00
+    final last = first.add(const Duration(days: 365));
+    final initial = now.isBefore(first) ? first : now;
+
+    // 1) INTENTO PRINCIPAL: showDatePicker con tema forzado (M3 + DatePickerTheme)
+    DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: first,
+      lastDate: last,
+      locale: const Locale('es', 'ES'),
+      useRootNavigator: true,
+      builder: (ctx, child) {
+        final base = Theme.of(ctx);
+        return Theme(
+          data: base.copyWith(
+            // Fuerza contraste y fondos del diálogo del datepicker
+            colorScheme: base.colorScheme.copyWith(
+              surface: Colors.white,
+              onSurface: Colors.black,
+              primary: base.colorScheme.primary,
+            ),
+            dialogBackgroundColor: Colors.white,
+            // ⚠️ En M3 el picker usa este tema específico
+            datePickerTheme: const DatePickerThemeData(
+              backgroundColor: Colors.white,
+              headerBackgroundColor: Colors.white,
+              headerForegroundColor: Colors.black,
+              dayForegroundColor: MaterialStatePropertyAll(Colors.black),
+              yearForegroundColor: MaterialStatePropertyAll(Colors.black),
+              todayForegroundColor: MaterialStatePropertyAll(Colors.black),
+            ),
+            // Si tu copyWith soporta esto, mantenlo; si no, ignóralo.
+            // ignore: deprecated_member_use
+            useMaterial3: true,
+          ),
+          child: child!,
+        );
+      },
     );
+
+    // 2) FALLBACK: si por tema/ROM el diálogo no se ve/retorna null, usa bottom sheet
+    if (picked == null) {
+      picked = await showModalBottomSheet<DateTime>(
+        context: context,
+        isScrollControlled: false,
+        showDragHandle: true,
+        backgroundColor: Colors.white,
+        builder: (ctx) {
+          DateTime selected = initial;
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Selecciona una fecha',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  CalendarDatePicker(
+                    initialDate: initial,
+                    firstDate: first,
+                    lastDate: last,
+                    onDateChanged: (d) =>
+                        selected = DateTime(d.year, d.month, d.day),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar')),
+                      const SizedBox(width: 8),
+                      FilledButton(
+                          onPressed: () => Navigator.pop(ctx, selected),
+                          child: const Text('Aceptar')),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
+
+    if (picked == null) return;
+
+    final fechaSolo = DateTime(picked.year, picked.month, picked.day);
+    final yyyyMMdd = DateFormat('yyyyMMdd').format(fechaSolo);
+    final docId = '${user.uid}_$yyyyMMdd';
+
+    setState(() => _guardando = true);
+    try {
+      await _db.collection('Peticiones').doc(docId).set({
+        'uid': user.uid,
+        'Fecha': Timestamp.fromDate(fechaSolo), // Timestamp para poder ordenar
+        'Admitido': 'Pendiente',
+        'creadoEn': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Petición registrada para $yyyyMMdd')),
+      );
+    } on FirebaseException catch (e) {
+      debugPrint('Error guardando petición: ${e.message}');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error al guardar la petición.')),
+      );
+    } finally {
+      if (mounted) setState(() => _guardando = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    final user = _auth.currentUser;
 
     final tiles = <Widget>[
       Card(
@@ -99,7 +164,7 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.chevron_right),
-          onTap: _guardando ? null : _solicitarDiaLibre,
+          onTap: _guardando ? null : _peticionDiaLibre,
         ),
       ),
       Card(
