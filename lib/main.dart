@@ -148,6 +148,15 @@ class SansebasSmsApp extends StatelessWidget {
         primarySwatch: Colors.green,
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('es', 'ES'),
+        Locale('en', 'US'),
+      ],
       routes: {
         '/usuario': (_) => const UsuarioScreen(),
         '/actualizar-token': (_) => const ActualizarTokenScreen(),
