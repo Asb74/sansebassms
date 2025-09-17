@@ -27,109 +27,41 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
       return;
     }
 
-    // Rango y fecha inicial seguros
     final now = DateTime.now();
-    final first = DateTime(now.year, now.month, now.day); // hoy 00:00
+    final first = DateTime(now.year, now.month, now.day);
     final last = first.add(const Duration(days: 365));
-    final initial = now.isBefore(first) ? first : now;
 
-    // 1) INTENTO PRINCIPAL: showDatePicker con tema forzado (M3 + DatePickerTheme)
-    DateTime? picked = await showDatePicker(
+    final picked = await showDatePicker(
       context: context,
-      initialDate: initial,
+      initialDate: first,
       firstDate: first,
       lastDate: last,
       locale: const Locale('es', 'ES'),
       useRootNavigator: true,
-      builder: (ctx, child) {
-        final base = Theme.of(ctx);
-        return Theme(
-          data: base.copyWith(
-            // Fuerza contraste y fondos del diálogo del datepicker
-            colorScheme: base.colorScheme.copyWith(
-              surface: Colors.white,
-              onSurface: Colors.black,
-              primary: base.colorScheme.primary,
-            ),
-            dialogBackgroundColor: Colors.white,
-            // ⚠️ En M3 el picker usa este tema específico
-            datePickerTheme: const DatePickerThemeData(
-              backgroundColor: Colors.white,
-              headerBackgroundColor: Colors.white,
-              headerForegroundColor: Colors.black,
-              dayForegroundColor: MaterialStatePropertyAll(Colors.black),
-              yearForegroundColor: MaterialStatePropertyAll(Colors.black),
-              todayForegroundColor: MaterialStatePropertyAll(Colors.black),
-            ),
-            // Si tu copyWith soporta esto, mantenlo; si no, ignóralo.
-            // ignore: deprecated_member_use
-            useMaterial3: true,
-          ),
-          child: child!,
-        );
-      },
     );
 
-    // 2) FALLBACK: si por tema/ROM el diálogo no se ve/retorna null, usa bottom sheet
+    // ⛔ Si cancela: cerrar picker y volver a la pantalla anterior a Área personal
     if (picked == null) {
-      picked = await showModalBottomSheet<DateTime>(
-        context: context,
-        isScrollControlled: false,
-        showDragHandle: true,
-        backgroundColor: Colors.white,
-        builder: (ctx) {
-          DateTime selected = initial;
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text('Selecciona una fecha',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  CalendarDatePicker(
-                    initialDate: initial,
-                    firstDate: first,
-                    lastDate: last,
-                    onDateChanged: (d) =>
-                        selected = DateTime(d.year, d.month, d.day),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar')),
-                      const SizedBox(width: 8),
-                      FilledButton(
-                          onPressed: () => Navigator.pop(ctx, selected),
-                          child: const Text('Aceptar')),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      );
+      if (mounted) Navigator.of(context).maybePop(); // salir de AreaPersonalScreen
+      return;
     }
 
-    if (picked == null) return;
-
+    // Normalizamos a 00:00 local
     final fechaSolo = DateTime(picked.year, picked.month, picked.day);
+    final motivo = await _pedirMotivo(context);
+    if (motivo == null) return; // canceló en el diálogo de motivo
+
     final yyyyMMdd = DateFormat('yyyyMMdd').format(fechaSolo);
     final docId = '${user.uid}_$yyyyMMdd';
 
     setState(() => _guardando = true);
     try {
       await _db.collection('Peticiones').doc(docId).set({
-        'uid': user.uid,
-        'Fecha': Timestamp.fromDate(fechaSolo), // Timestamp para poder ordenar
-        'Admitido': 'Pendiente',
-        'creadoEn': FieldValue.serverTimestamp(),
+        'uid'      : user.uid,
+        'Fecha'    : Timestamp.fromDate(fechaSolo),
+        'Admitido' : 'Pendiente',
+        'Motivo'   : motivo,
+        'creadoEn' : FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
       if (!mounted) return;
@@ -137,7 +69,7 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
         SnackBar(content: Text('Petición registrada para $yyyyMMdd')),
       );
     } on FirebaseException catch (e) {
-      debugPrint('Error guardando petición: ${e.message}');
+      debugPrint('Error guardando petición: ${e.code} ${e.message}');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error al guardar la petición.')),
@@ -226,4 +158,55 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
       ),
     );
   }
+}
+
+Future<String?> _pedirMotivo(BuildContext context) async {
+  final formKey = GlobalKey<FormState>();
+  final controller = TextEditingController();
+
+  final res = await showDialog<String>(
+    context: context,
+    barrierDismissible: false,
+    builder: (ctx) {
+      return AlertDialog(
+        title: const Text('Motivo de la petición'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            maxLength: 150,
+            minLines: 2,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              hintText: 'Escribe el motivo (10–150 caracteres)',
+              counterText: '',
+            ),
+            validator: (v) {
+              final t = (v ?? '').trim();
+              if (t.length < 10) return 'Mínimo 10 caracteres';
+              if (t.length > 150) return 'Máximo 150 caracteres';
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.of(ctx).pop(controller.text.trim());
+              }
+            },
+            child: const Text('Aceptar'),
+          ),
+        ],
+      );
+    },
+  );
+
+  controller.dispose();
+  return res; // null si canceló
 }
