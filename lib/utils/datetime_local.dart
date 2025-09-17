@@ -54,6 +54,12 @@ String formatLocal(dynamic value) {
   return DateFormat('dd/MM/yyyy HH:mm').format(dt);
 }
 
+String formatLocalDay(dynamic value) {
+  final dt = toLocalDate(value);
+  if (dt == null) return '(sin fecha)';
+  return DateFormat('dd/MM/yyyy').format(dt);
+}
+
 String formatLocalFromDayHour(dynamic dia, dynamic hora) {
   final dt = combineLocalDayHour(dia, hora);
   if (dt == null) return '(sin fecha)';
