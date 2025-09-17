@@ -63,45 +63,74 @@ class ReportMensajesScreen extends StatelessWidget {
             );
           }
 
+          final items = docs
+              .map((doc) {
+                final data = doc.data();
+                final dia = data['Dia'] ?? data['dia'];
+                final hora = data['Hora'] ?? data['hora'];
+                final prefer = combineLocalDayHour(dia, hora);
+                final alt =
+                    toLocalDate(data['fechaHora'] ?? data['Fecha'] ?? data['fecha']);
+                final dt = prefer ?? alt ?? DateTime.fromMillisecondsSinceEpoch(0);
+                return {'doc': doc, 'data': data, 'dt': dt};
+              })
+              .toList()
+            ..sort((a, b) => (b['dt'] as DateTime).compareTo(a['dt'] as DateTime));
+
           return Scrollbar(
             child: ListView.separated(
               padding: const EdgeInsets.all(16),
-              itemCount: docs.length,
+              itemCount: items.length,
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
-                final data = docs[index].data();
-                final mensaje = (data['mensaje'] as String?)?.trim();
-                final telefono = (data['telefono'] as String?)?.trim();
-                final estado = (data['estado'] as String?)?.trim();
-                final fecha = formatLocal(data['fechaHora']);
+                final data = items[index]['data'] as Map<String, dynamic>;
+
+                final mensaje = (data['mensaje'] ?? '').toString().trim();
+                final telefono = (data['telefono'] ?? '').toString().trim();
+                final estado = (data['estado'] ?? '').toString().trim();
+                final cuerpo =
+                    (data['cuerpo'] ?? data['Cuerpo'] ?? '').toString().trim();
+
+                final dia = data['Dia'] ?? data['dia'];
+                final hora = data['Hora'] ?? data['hora'];
+
+                String fechaVis;
+                DateTime? dtOrden;
+
+                final dtPrefer = combineLocalDayHour(dia, hora);
+                if (dtPrefer != null) {
+                  fechaVis = formatLocalFromDayHour(dia, hora);
+                  dtOrden = dtPrefer;
+                } else {
+                  final alternativa = data['fechaHora'] ?? data['Fecha'] ?? data['fecha'];
+                  fechaVis = formatLocal(alternativa);
+                  dtOrden = toLocalDate(alternativa);
+                }
+
                 assert(() {
-                  final dt = toLocalDate(data['fechaHora']);
+                  final rawFecha = data['fechaHora'] ?? data['Fecha'] ?? data['fecha'];
                   // ignore: avoid_print
                   print(
-                    "[DEBUG] uid=${data['uid']} fechaHoraUTC=${(data['fechaHora'] as Timestamp?)?.toDate()} local=$dt",
+                    '[DEBUG] uid=${data['uid']} prefer=$dtPrefer fallback=$rawFecha orden=$dtOrden',
                   );
                   return true;
                 }());
 
                 return Card(
+                  elevation: 1,
                   child: ListTile(
-                    leading: const Icon(Icons.message_outlined),
-                    title: Text(mensaje?.isNotEmpty == true
-                        ? mensaje!
-                        : 'Mensaje sin contenido'),
+                    leading: const Icon(Icons.message),
+                    title: Text(mensaje.isEmpty ? '(sin texto)' : mensaje),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        if (telefono?.isNotEmpty == true)
-                          Text('Teléfono: ${telefono!}')
-                        else
-                          const Text('Teléfono no disponible'),
-                        Text('Estado: ${estado?.isNotEmpty == true ? estado! : 'Desconocido'}'),
-                        Text('Fecha: $fecha'),
+                        if (telefono.isNotEmpty) Text('Teléfono: $telefono'),
+                        if (estado.isNotEmpty) Text('Estado: $estado'),
+                        if (cuerpo.isNotEmpty) Text('Cuerpo: $cuerpo'),
+                        Text('Fecha: $fechaVis'),
                       ],
                     ),
-                    isThreeLine: true,
                   ),
                 );
               },
