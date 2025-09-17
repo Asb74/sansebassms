@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:sansebassms/utils/datetime_local.dart';
 
 class ReportMensajesScreen extends StatelessWidget {
   const ReportMensajesScreen({super.key});
@@ -73,18 +73,15 @@ class ReportMensajesScreen extends StatelessWidget {
                 final mensaje = (data['mensaje'] as String?)?.trim();
                 final telefono = (data['telefono'] as String?)?.trim();
                 final estado = (data['estado'] as String?)?.trim();
-                final fechaHora = data['fechaHora'];
-
-                DateTime? fecha;
-                if (fechaHora is Timestamp) {
-                  fecha = fechaHora.toDate();
-                } else if (fechaHora is DateTime) {
-                  fecha = fechaHora;
-                }
-
-                final fechaFormateada = fecha != null
-                    ? DateFormat('dd/MM/yyyy HH:mm').format(fecha)
-                    : 'Fecha desconocida';
+                final fecha = formatLocal(data['fechaHora']);
+                assert(() {
+                  final dt = toLocalDate(data['fechaHora']);
+                  // ignore: avoid_print
+                  print(
+                    "[DEBUG] uid=${data['uid']} fechaHoraUTC=${(data['fechaHora'] as Timestamp?)?.toDate()} local=$dt",
+                  );
+                  return true;
+                }());
 
                 return Card(
                   child: ListTile(
@@ -101,7 +98,7 @@ class ReportMensajesScreen extends StatelessWidget {
                         else
                           const Text('Teléfono no disponible'),
                         Text('Estado: ${estado?.isNotEmpty == true ? estado! : 'Desconocido'}'),
-                        Text('Fecha: $fechaFormateada'),
+                        Text('Fecha: $fecha'),
                       ],
                     ),
                     isThreeLine: true,
