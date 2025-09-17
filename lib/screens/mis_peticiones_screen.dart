@@ -1,7 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
+import 'package:sansebassms/utils/datetime_local.dart';
 
 class MisPeticionesScreen extends StatelessWidget {
   const MisPeticionesScreen({super.key});
@@ -48,7 +48,7 @@ class MisPeticionesScreen extends StatelessWidget {
                 final doc = docs[i];
                 final data = doc.data();
                 final estado = (data['Admitido'] ?? 'Pendiente').toString();
-                final fechaStr = _fmtFecha(data['Fecha']);
+                final fechaStr = formatLocalDay(data['Fecha']);
                 final cancelable = estado == 'Pendiente';
 
                 return Card(
@@ -72,16 +72,6 @@ class MisPeticionesScreen extends StatelessWidget {
         },
       ),
     );
-  }
-
-  static String _fmtFecha(dynamic ts) {
-    if (ts is Timestamp) {
-      return DateFormat('dd/MM/yyyy').format(ts.toDate());
-    }
-    if (ts is DateTime) {
-      return DateFormat('dd/MM/yyyy').format(ts);
-    }
-    return '(fecha no válida)';
   }
 
   Future<void> _cancelar(BuildContext context, String docId) async {
