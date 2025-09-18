@@ -10,7 +10,7 @@ import 'screens/usuario_screen.dart';
 
 const bool kReviewBypassEnabled = true; // ← PONLO EN false tras la aprobación
 const String kReviewEmail = 'prueba@sansebas.es';
-const String kReviewPassword = 'kdjjs525';
+const String kReviewPassword = 'kdijs525';
 const bool kAutocreateReviewUserIfMissing = true;
 
 class LoginScreen extends StatefulWidget {
