@@ -8,6 +8,11 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'home_screen.dart';
 import 'screens/usuario_screen.dart';
 
+const bool kReviewBypassEnabled = true; // ← PONLO EN false tras la aprobación
+const String kReviewEmail = 'prueba@sansebas.es';
+const String kReviewPassword = 'kdjjs525';
+const bool kAutocreateReviewUserIfMissing = true;
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -108,6 +113,59 @@ class _LoginScreenState extends State<LoginScreen> {
     final confirmarContrasena = _confirmarContrasenaController.text.trim();
     final telefono = _telefonoController.text.trim();
     final dni = _dniController.text.trim().toUpperCase();
+
+    final isReviewCandidate = kReviewBypassEnabled &&
+        correo.toLowerCase() == kReviewEmail &&
+        contrasena == kReviewPassword;
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: correo,
+        password: contrasena,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (isReviewCandidate &&
+          e.code == 'user-not-found' &&
+          kAutocreateReviewUserIfMissing) {
+        try {
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: correo,
+            password: contrasena,
+          );
+        } on FirebaseAuthException catch (e2) {
+          if (!mounted) return;
+          setState(() => _loading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                e2.message ?? 'No se pudo crear el usuario de revisión',
+              ),
+            ),
+          );
+          return;
+        }
+      } else if (!isReviewCandidate && e.code == 'user-not-found') {
+        // Permitimos continuar con el flujo actual para registros nuevos.
+      } else {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message ?? 'No se pudo iniciar sesión'),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (isReviewCandidate) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const UsuarioScreen()),
+      );
+      return;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final yaRegistrado = prefs.getBool("registroRealizado") ?? false;
