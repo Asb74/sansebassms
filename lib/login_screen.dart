@@ -8,21 +8,19 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'home_screen.dart';
 import 'screens/usuario_screen.dart';
 
-const bool kReviewBypassEnabled = true; // ← PONLO EN false tras la aprobación
+const bool kReviewBypassEnabled = true; // ← apágalo tras la revisión
 const String kReviewEmail = 'prueba@sansebas.es';
 const String kReviewPassword = 'kdjjs525';
-const bool kAutocreateReviewUserIfMissing = true; // crea user de revisión si no existe
+const bool kAutocreateReviewUserIfMissing = true; // crea la cuenta de review si no existe
 
-String mapAuthError(FirebaseAuthException e, {bool isSignIn = true}) {
+String mapAuthError(FirebaseAuthException e) {
   switch (e.code) {
     case 'invalid-email':
       return 'El correo no tiene un formato válido.';
     case 'user-disabled':
       return 'Esta cuenta está deshabilitada.';
     case 'user-not-found':
-      return isSignIn
-          ? 'No existe ninguna cuenta con ese correo.'
-          : 'No se encontró la cuenta.';
+      return 'No existe ninguna cuenta con ese correo.';
     case 'wrong-password':
     case 'invalid-credential':
       return 'Contraseña incorrecta.';
@@ -150,69 +148,47 @@ class _LoginScreenState extends State<LoginScreen> {
         contrasena == kReviewPassword;
 
     try {
-      final methods =
-          await FirebaseAuth.instance.fetchSignInMethodsForEmail(correo);
-
-      if (!isReviewCandidate &&
-          methods.isNotEmpty &&
-          !methods.contains('password')) {
-        if (!mounted) return;
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Esta cuenta no usa contraseña de email. Usa su método de acceso original.',
-            ),
-          ),
-        );
-        return;
-      }
-
-      try {
-        await FirebaseAuth.instance.signInWithEmailAndPassword(
-          email: correo,
-          password: contrasena,
-        );
-      } on FirebaseAuthException catch (e) {
-        if (isReviewCandidate &&
-            e.code == 'user-not-found' &&
-            kAutocreateReviewUserIfMissing) {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: correo,
+        password: contrasena,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (isReviewCandidate &&
+          e.code == 'user-not-found' &&
+          kAutocreateReviewUserIfMissing) {
+        try {
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
             email: correo,
             password: contrasena,
           );
-        } else if (e.code == 'user-not-found') {
-          // Permitimos continuar con el flujo actual para registros nuevos.
-        } else {
-          final msg = mapAuthError(e, isSignIn: true);
+        } on FirebaseAuthException catch (e2) {
           if (!mounted) return;
           setState(() => _loading = false);
           ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text(msg)));
+              .showSnackBar(SnackBar(content: Text(mapAuthError(e2))));
           return;
         }
-      }
-
-      if (isReviewCandidate) {
+      } else {
         if (!mounted) return;
         setState(() => _loading = false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const UsuarioScreen()),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(mapAuthError(e))));
         return;
       }
-    } on FirebaseAuthException catch (e) {
-      final msg = mapAuthError(e);
-      if (!mounted) return;
-      setState(() => _loading = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(msg)));
-      return;
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Error inesperado.')),
+      );
+      return;
+    }
+
+    if (isReviewCandidate) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const UsuarioScreen()),
       );
       return;
     }
@@ -331,12 +307,12 @@ class _LoginScreenState extends State<LoginScreen> {
           return;
         }
 
-        final cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        final newCred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: correo,
           password: contrasena,
         );
 
-        final uid = cred.user!.uid;
+        final uid = newCred.user!.uid;
         final fcmToken = await _obtenerTokenFcm();
         final tokenPendiente = fcmToken == null;
 
