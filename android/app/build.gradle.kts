@@ -15,7 +15,7 @@ val keystoreProps = Properties().apply {
     }
 }
 
-val flutterVersionCode = project.properties["flutter.versionCode"] as String? ?: "3"
+val flutterVersionCode = project.properties["flutter.versionCode"] as String? ?: "4"
 val flutterVersionName = project.properties["flutter.versionName"] as String? ?: "1.0.0"
 
 android {
