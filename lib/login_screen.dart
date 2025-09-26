@@ -10,8 +10,30 @@ import 'screens/usuario_screen.dart';
 
 const bool kReviewBypassEnabled = true; // ← PONLO EN false tras la aprobación
 const String kReviewEmail = 'prueba@sansebas.es';
-const String kReviewPassword = 'kdijs525';
-const bool kAutocreateReviewUserIfMissing = true;
+const String kReviewPassword = 'kdjjs525';
+const bool kAutocreateReviewUserIfMissing = true; // crea user de revisión si no existe
+
+String mapAuthError(FirebaseAuthException e, {bool isSignIn = true}) {
+  switch (e.code) {
+    case 'invalid-email':
+      return 'El correo no tiene un formato válido.';
+    case 'user-disabled':
+      return 'Esta cuenta está deshabilitada.';
+    case 'user-not-found':
+      return isSignIn
+          ? 'No existe ninguna cuenta con ese correo.'
+          : 'No se encontró la cuenta.';
+    case 'wrong-password':
+    case 'invalid-credential':
+      return 'Contraseña incorrecta.';
+    case 'too-many-requests':
+      return 'Demasiados intentos. Prueba más tarde.';
+    case 'network-request-failed':
+      return 'Sin conexión. Revisa tu internet.';
+    default:
+      return e.message ?? 'Error de autenticación: ${e.code}';
+  }
+}
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -109,60 +131,88 @@ class _LoginScreenState extends State<LoginScreen> {
     });
 
     final correo = _correoController.text.trim();
-    final contrasena = _contrasenaController.text.trim();
+    final contrasena = _contrasenaController.text;
     final confirmarContrasena = _confirmarContrasenaController.text.trim();
     final telefono = _telefonoController.text.trim();
     final dni = _dniController.text.trim().toUpperCase();
+
+    if (correo.isEmpty || contrasena.isEmpty) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Introduce correo y contraseña.')),
+      );
+      return;
+    }
 
     final isReviewCandidate = kReviewBypassEnabled &&
         correo.toLowerCase() == kReviewEmail &&
         contrasena == kReviewPassword;
 
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: correo,
-        password: contrasena,
-      );
-    } on FirebaseAuthException catch (e) {
-      if (isReviewCandidate &&
-          e.code == 'user-not-found' &&
-          kAutocreateReviewUserIfMissing) {
-        try {
-          await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: correo,
-            password: contrasena,
-          );
-        } on FirebaseAuthException catch (e2) {
-          if (!mounted) return;
-          setState(() => _loading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                e2.message ?? 'No se pudo crear el usuario de revisión',
-              ),
-            ),
-          );
-          return;
-        }
-      } else if (!isReviewCandidate && e.code == 'user-not-found') {
-        // Permitimos continuar con el flujo actual para registros nuevos.
-      } else {
+      final methods =
+          await FirebaseAuth.instance.fetchSignInMethodsForEmail(correo);
+
+      if (!isReviewCandidate &&
+          methods.isNotEmpty &&
+          !methods.contains('password')) {
         if (!mounted) return;
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.message ?? 'No se pudo iniciar sesión'),
+          const SnackBar(
+            content: Text(
+              'Esta cuenta no usa contraseña de email. Usa su método de acceso original.',
+            ),
           ),
         );
         return;
       }
-    }
 
-    if (isReviewCandidate) {
+      try {
+        await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: correo,
+          password: contrasena,
+        );
+      } on FirebaseAuthException catch (e) {
+        if (isReviewCandidate &&
+            e.code == 'user-not-found' &&
+            kAutocreateReviewUserIfMissing) {
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: correo,
+            password: contrasena,
+          );
+        } else if (e.code == 'user-not-found') {
+          // Permitimos continuar con el flujo actual para registros nuevos.
+        } else {
+          final msg = mapAuthError(e, isSignIn: true);
+          if (!mounted) return;
+          setState(() => _loading = false);
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text(msg)));
+          return;
+        }
+      }
+
+      if (isReviewCandidate) {
+        if (!mounted) return;
+        setState(() => _loading = false);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const UsuarioScreen()),
+        );
+        return;
+      }
+    } on FirebaseAuthException catch (e) {
+      final msg = mapAuthError(e);
       if (!mounted) return;
       setState(() => _loading = false);
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const UsuarioScreen()),
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(msg)));
+      return;
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Error inesperado.')),
       );
       return;
     }
@@ -332,16 +382,20 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               TextField(
                 controller: _correoController,
+                keyboardType: TextInputType.emailAddress,
+                autocorrect: false,
                 decoration: const InputDecoration(labelText: "Correo"),
               ),
               TextField(
                 controller: _contrasenaController,
                 obscureText: true,
+                autocorrect: false,
                 decoration: const InputDecoration(labelText: "Contraseña"),
               ),
               TextField(
                 controller: _confirmarContrasenaController,
                 obscureText: true,
+                autocorrect: false,
                 decoration: const InputDecoration(labelText: "Confirmar Contraseña"),
               ),
               TextField(
