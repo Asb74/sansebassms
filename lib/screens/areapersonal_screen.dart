@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+import '../login_screen.dart';
 import 'mis_peticiones_screen.dart';
 import 'report_mensajes_screen.dart';
 
@@ -15,8 +16,202 @@ class AreaPersonalScreen extends StatefulWidget {
 
 class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
   bool _guardando = false;
+  bool _deleting = false;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  // Si true, además de borrar la cuenta de Auth, limpia la colección Peticiones del usuario
+  static const bool kDeleteFirestoreData = true;
+
+  Future<void> _confirmDeleteAccount() async {
+    if (_deleting) return;
+
+    // Aviso inicial
+    final continuar = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar mi cuenta'),
+        content: const Text(
+          'Esta acción es permanente. Se eliminará tu usuario de la aplicación.\n'
+          'No podrás deshacerlo.'
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Continuar')),
+        ],
+      ),
+    );
+
+    if (continuar != true) return;
+
+    // Confirmación escribiendo la palabra ELIMINAR
+    final ok = await _secondConfirm();
+    if (ok != true) return;
+
+    await _deleteAccountFlow();
+  }
+
+  Future<bool?> _secondConfirm() async {
+    final controller = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirmación final'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: controller,
+            decoration: const InputDecoration(
+              labelText: 'Escribe: ELIMINAR',
+            ),
+            validator: (v) {
+              if ((v ?? '').trim() != 'ELIMINAR') {
+                return 'Debes escribir exactamente: ELIMINAR';
+              }
+              return null;
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState?.validate() ?? false) {
+                Navigator.pop(context, true);
+              }
+            },
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return res;
+  }
+
+  Future<void> _deleteAccountFlow() async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('No hay sesión activa.')));
+      return;
+    }
+
+    setState(() => _deleting = true);
+    try {
+      // 1) (opcional) Eliminar datos del usuario en Firestore
+      if (kDeleteFirestoreData) {
+        await _deleteUserCollections(user.uid);
+      }
+
+      // 2) Intentar eliminar cuenta de Auth
+      await user.delete();
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        // Pedir contraseña y reautenticar (email/password)
+        final ok = await _reauthenticateAndRetryDelete(user);
+        if (!ok) {
+          setState(() => _deleting = false);
+          return;
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No se pudo eliminar la cuenta: ${e.message ?? e.code}')),
+        );
+        setState(() => _deleting = false);
+        return;
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Error inesperado al borrar la cuenta.')));
+      setState(() => _deleting = false);
+      return;
+    }
+
+    // 3) Sign out y navegar a login
+    try {
+      await _auth.signOut();
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('Tu cuenta se ha eliminado.')));
+    setState(() => _deleting = false);
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  Future<bool> _reauthenticateAndRetryDelete(User user) async {
+    final email = user.email;
+    if (email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo reautenticar: email no disponible.')),
+      );
+      return false;
+    }
+
+    final pass = await _askPassword();
+    if (pass == null) return false;
+
+    try {
+      final cred = EmailAuthProvider.credential(email: email, password: pass);
+      await user.reauthenticateWithCredential(cred);
+      await user.delete();
+      return true;
+    } on FirebaseAuthException catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Reautenticación fallida: ${e.message ?? e.code}')),
+      );
+      return false;
+    }
+  }
+
+  Future<String?> _askPassword() async {
+    final controller = TextEditingController();
+    final res = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        title: const Text('Confirmar con contraseña'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          decoration: const InputDecoration(
+            labelText: 'Contraseña',
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Confirmar')),
+        ],
+      ),
+    );
+    controller.dispose();
+    return res;
+  }
+
+  /// Borra en páginas la colección Peticiones del usuario (si existe)
+  Future<void> _deleteUserCollections(String uid) async {
+    // Peticiones
+    Query q = _db.collection('Peticiones').where('uid', isEqualTo: uid).limit(100);
+    while (true) {
+      final snap = await q.get();
+      if (snap.docs.isEmpty) break;
+      final batch = _db.batch();
+      for (final d in snap.docs) {
+        batch.delete(d.reference);
+      }
+      await batch.commit();
+      if (snap.docs.length < 100) break;
+    }
+
+    // Si quieres borrar otras colecciones del usuario, repite patrón aquí.
+  }
 
   Future<void> _peticionDiaLibre() async {
     final user = _auth.currentUser;
@@ -130,6 +325,21 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
           },
         ),
       ),
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.delete_forever),
+          title: const Text('Eliminar mi cuenta'),
+          subtitle: const Text('Borra tu usuario de forma permanente'),
+          trailing: _deleting
+              ? const SizedBox(
+                  height: 24,
+                  width: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.chevron_right),
+          onTap: _deleting ? null : _confirmDeleteAccount,
+        ),
+      ),
     ];
 
     if (user == null) {
@@ -148,13 +358,27 @@ class _AreaPersonalScreenState extends State<AreaPersonalScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Área personal')),
-      body: Scrollbar(
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemBuilder: (context, index) => tiles[index],
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemCount: tiles.length,
-        ),
+      body: Stack(
+        children: [
+          AbsorbPointer(
+            absorbing: _deleting,
+            child: Scrollbar(
+              child: ListView.separated(
+                padding: const EdgeInsets.all(16),
+                itemBuilder: (context, index) => tiles[index],
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemCount: tiles.length,
+              ),
+            ),
+          ),
+          if (_deleting)
+            Container(
+              color: Colors.black45,
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+        ],
       ),
     );
   }
