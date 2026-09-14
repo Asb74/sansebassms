@@ -20,7 +20,7 @@ val flutterVersionName = project.properties["flutter.versionName"] as String? ?:
 
 android {
     namespace = "com.sansebas.sansebassms"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -36,7 +36,7 @@ android {
     defaultConfig {
         applicationId = "com.sansebas.sansebassms"
         minSdk = 23
-        targetSdk = 35
+        targetSdk = 36
         versionCode = flutterVersionCode.toInt()
         versionName = flutterVersionName
 
